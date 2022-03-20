@@ -1,0 +1,7 @@
+"0","m_sumexpSub_diff <- sumexpSub_diff %>% dplyr::group_by(targetDur, Exp) %>%"
+"0","    dplyr::summarise(m_diff_RP = mean(diff_RP), "
+"0","                     n= n(), m_diff_sd_RP = mean(diff_sd_RP), "
+"0","                     m_diff_RP_Normalized = mean(diff_RP_Normalized), "
+"0","                     sd_diff_RP = sd(diff_RP), m_diff_sd_RP_Normalized = sd(diff_RP_Normalized))"
+"1","`summarise()` has grouped output by 'targetDur'. You can override using the `.groups` argument.
+"

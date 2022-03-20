@@ -1,0 +1,5 @@
+"0","mslope_pr = left_join(mslope_pr, temp_slope_pr, by = c(""Exp"", ""priortype"", ""range""))"
+"0","mslope_pr$y = 0.02"
+"0","mslope_pr[which(mslope_pr$priortype == 'IR'),""y""] = 0.2"
+"0","mslope_pr$targetDur = mslope_pr$y"
+"0","mslope_pr$m_m_RP = mslope_pr$y"

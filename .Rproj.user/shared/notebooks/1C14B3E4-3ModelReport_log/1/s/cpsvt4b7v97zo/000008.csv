@@ -1,0 +1,13 @@
+"0","m_mean_sd <- dplyr::group_by(All_predY, Exp, targetDur, model, priortype) %>%"
+"0","  dplyr::summarize( n = n(), "
+"0","                    m_RP = mean(RP), #mean of observed RP"
+"0","                    sd_RP = sd(RP), #observed sd of RP"
+"0","                    m_sig_r = mean(sig_r),"
+"0","                    m_mu_r = mean(mu_r),"
+"0","                    sd_mu_r = sd(mu_r)"
+"0","  )"
+"1","`summarise()` has grouped output by 'Exp', 'targetDur', 'model'. You can override using the `.groups` argument.
+"
+"0","m_mean_sd$merr_mu_r <- (m_mean_sd$m_mu_r - m_mean_sd$m_RP)/m_mean_sd$m_RP"
+"0","m_mean_sd$merr_sig_r <- (m_mean_sd$m_sig_r - m_mean_sd$sd_RP)/m_mean_sd$sd_RP"
+"0","m_mean_sd"

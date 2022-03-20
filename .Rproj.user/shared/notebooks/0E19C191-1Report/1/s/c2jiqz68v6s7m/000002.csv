@@ -1,0 +1,3 @@
+"0","temp_mCI_gr = mCI_gr%>% select(Exp, group, m_InP, se_InP)"
+"0",""
+"0","temp_mCI_gr = left_join(temp_mCI_gr, Exp_dist,  by =c(""Exp"", ""group""))"

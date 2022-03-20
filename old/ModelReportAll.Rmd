@@ -1,0 +1,492 @@
+---
+title: "ModelReportAll"
+author: "Fiona Zhu"
+date: "4/4/2020"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+## Load the packages
+```{r include=FALSE}
+#Parallel compute parameters for each subject each model 
+#source('runModel.r')     #'H0_B1', 'H2_V1', 'H3_V1'
+#source('runModel2.r')     #'H2_V2', 'H3_V2'
+source('runModel3.R')     #'H2_V3', 'H3_V3'  manuscript based on this model
+```
+
+```{r}
+options(mc.cores = parallel::detectCores()-1)
+rstan_options (auto_write=TRUE)
+```
+
+
+```{r}
+#customize theme
+theme_new <- theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        strip.background = element_rect(color = "white", fill = "white"),
+        panel.grid = element_blank())
+
+```
+
+
+## Define the Rstan models and functions to plot
+
+### Definition of the function to merge rstan result data
+To further uncover the underlying structure of the prior, we hypothesize that in addition to two local priors, there is a general global prior.Participants may combine both local and global priors for the final reproduction. There are multiple possibilities for integrating those local and global priors with the sensory inputs. For examples, the sensory input could first integrate with the local prior, and then integrate with the global prior (a hierarchical local-global model, see Figure 7B in D1 proposal). 
+
+Our Hypothesis
+
+* H2:  A hierarchical local-global model
+In H2, global and local priors are integrated first. That means local prior is integrated with sensory input firstly, then global prior integrates with sensory input. 
+
+The sensory input ($D_s$) first integrates with the local prior ($P_L$) to a posterior ($D_L$), which further integrates with the global prior ($P_G$) to generate a final posterior for reproduction ($D_r$).
+
+
+* H3: Global prior (the dual integration model)
+
+integration of local priors firstly, then integration of the global prior
+
+Both local and global priors independently integrate with the sensory inputs to generate two posteriors ($D_L$) and ($D_G$), the latter two are combined together for reproduction ($D_r$).
+
+###  compute parameters for all models
+
+```{r}
+# function to run models on  lrz cluster parallely
+runModel<- function(AllExpData, modelname, rltname){
+  expList <- unique(AllExpData$Exp)
+  subList <- unique(AllExpData$NSub)
+  # H2_V1  There were 135 divergent transitions after warmup.
+  sub_exp_dat <- list()
+    for (expName in expList) {
+      data_exp <- AllExpData %>% dplyr::filter(valid  == 1 & Exp == expName)
+      data_exp$model <- modelname
+      sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
+      for (subNo in subList) {
+        sub_exp_dat <- list.append(sub_exp_dat, sub_exp[[subNo]])
+      }
+    }
+
+  rlt <- runModelcluster(sub_exp_dat)
+  saveRDS(rlt, file = paste0(getwd(), "/", rstanmodelPath, "/rlt/rlt_", rltname,".rds"))
+}
+```
+
+
+```{r}
+# execute the model running
+modellist_V3 <- c('H2_V3', 'H3_V3') 
+
+modellist <- modellist_V3
+if (runModels == TRUE){
+  for(model in modellist){
+    runModel(AllExpData, model, model)
+  }
+}
+```
+
+
+### Merge the Result data
+
+To preprocess the model result data, and merge different model version data together.
+
+```{r}
+#function to merge the model result data
+
+funMergeMRlt <- function(modellist, path, version){
+  rltfilename <- {}
+  rltfilename <- c(rltfilename, paste0("rlt_", modellist, ".rds"))
+  AllDat_Bayparlist <- {}
+  AllDat_predY_mix <- {}
+  AllDat_predY_s <- {}
+  AllDat_predY_l <- {}
+  modelResultAll <- list()
+  merge.data.all <- {}
+  merge.data <- readRDS(paste0(getwd(), "/", path, "/rlt/", rltfilename[1]))
+  for (i in 1:length(merge.data)){
+    modelResultAll <- list.append(modelResultAll, merge.data[[i]])
+    AllDat_Bayparlist <- rbind(AllDat_Bayparlist, merge.data[[i]]$Baypar)
+    AllDat_predY_mix <- rbind(AllDat_predY_mix, merge.data[[i]]$PredY_mix_list)
+    AllDat_predY_s <- rbind(AllDat_predY_s, merge.data[[i]]$PredY_s_list)
+    AllDat_predY_l <- rbind(AllDat_predY_l, merge.data[[i]]$PredY_l_list)
+  }
+  
+  if (length(rltfilename) >= 2) {
+    for (i in 2:length(rltfilename)){
+      new.data = readRDS(paste0(getwd(), "/", path, "/rlt/", rltfilename[i]))
+      for (i in 1:length(new.data)){
+        modelResultAll <- list.append(modelResultAll,new.data[[i]])
+        AllDat_Bayparlist <- rbind(AllDat_Bayparlist, new.data[[i]]$Baypar)
+        AllDat_predY_mix <- rbind(AllDat_predY_mix, new.data[[i]]$PredY_mix_list)
+        AllDat_predY_s <- rbind(AllDat_predY_s, new.data[[i]]$PredY_s_list)
+        AllDat_predY_l <- rbind(AllDat_predY_l, new.data[[i]]$PredY_l_list)
+      }
+    }
+  }
+  write.csv(AllDat_Bayparlist, paste0(getwd(), "/", path, "/rlt/AllDat_Bayparlist_", version, ".csv"))
+  write.csv(AllDat_predY_mix, paste0(getwd(), "/", path, "/rlt/AllDat_predY_mix_", version, ".csv"))
+  write.csv(AllDat_predY_s, paste0(getwd(), "/", path, "/rlt/AllDat_predY_s_", version, ".csv"))
+  write.csv(AllDat_predY_l, paste0(getwd(), "/", path, "/rlt/AllDat_predY_l_", version, ".csv"))
+  saveRDS(modelResultAll, file = paste0(getwd(), "/", path, "/rlt/modelResultAll_", version, ".rds")) 
+}
+
+```
+
+```{r include=FALSE}
+needmerge = 1
+modellist_V3 <- c('H2_V3', 'H3_V3')  
+modellist_V1 <- c('H0_B1', 'H2_V1', 'H3_V1')  
+modellist_V2 <- c('H2_V2_2')  
+
+if (needmerge == 1){
+  funMergeMRlt(modellist_V3, rstanmodelPath, 'V3')
+  #funMergeMRlt(modellist_V1, rstanmodelPath, 'V1')
+}
+```
+
+<!-- ### load result data (V1) -->
+
+<!-- ```{r include=FALSE} -->
+<!-- AllDat_Bayparlist1 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_Bayparlist_V1.csv")) -->
+<!-- AllDat_predY_mix1 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_predY_mix_V1.csv")) -->
+<!-- AllDat_predY_s1 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_predY_s_V1.csv")) -->
+<!-- AllDat_predY_l1 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_predY_l_V1.csv")) -->
+<!-- ``` -->
+
+
+
+<!-- ### Analysis on the Rstan model parameters -->
+
+<!-- #### Parameters -->
+<!-- ```{r} -->
+<!-- # AllDat_Bayparlist1$model <- factor(AllDat_Bayparlist1$model, labels = c( "Hierarchical local-global model","Dual integration model")) -->
+<!-- m_Baypar <- dplyr::group_by(AllDat_Bayparlist1, Exp, model) %>% -->
+<!--   dplyr::summarize(m_as = mean(a_s), m_al = mean(a_l), -->
+<!--                    m_bs = mean(b_s), m_bl = mean(b_l), -->
+<!--                    p_wf = mean(p_wf))  -->
+<!-- m_Baypar -->
+<!-- ``` -->
+
+
+<!-- ###  wf in models -->
+<!-- ```{r} -->
+<!-- ggplot(m_Baypar, aes(x = Exp, y = m_as, color = model, fill = model, group = model)) +  -->
+<!--   geom_bar(stat = "identity", -->
+<!--            position = position_dodge()) + -->
+<!--   theme_new -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- ggplot(m_Baypar, aes(x = Exp, y = m_bs, color = model, fill = model, group = model)) +  -->
+<!--   geom_bar(stat = "identity", -->
+<!--            position = position_dodge()) + -->
+<!--   theme_new -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- ggplot(m_Baypar, aes(x = Exp, y = m_al, color = model, fill = model, group = model)) +  -->
+<!--   geom_bar(stat = "identity", -->
+<!--            position = position_dodge()) + -->
+<!--   theme_new -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- ggplot(m_Baypar, aes(x = Exp, y = m_bl, color = model, fill = model, group = model)) +  -->
+<!--   geom_bar(stat = "identity", -->
+<!--            position = position_dodge()) + -->
+<!--   theme_new -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- ggplot(m_Baypar, aes(x = Exp, y = p_wf, color = model, fill = model, group = model)) +  -->
+<!--   geom_bar(stat = "identity", -->
+<!--            position = position_dodge()) + -->
+<!--   theme_new -->
+<!-- ``` -->
+
+
+
+<!-- ## Prediction results (mixed block) -->
+
+<!-- ```{r} -->
+
+<!-- predY_mix <- group_by(AllDat_predY_mix1, targetDur, Exp, NSub, model) %>% -->
+<!--   summarize(m_RP = mean(RP), n = n(), sd_RP = sd(RP)/ sqrt(n-1),m_predY = mean(predY), sd_predY = sd(predY)/ sqrt(n-1)) %>% -->
+<!--   group_by(targetDur, Exp, model) %>% -->
+<!--   summarize( -->
+<!--     n = n(), -->
+<!--     m_m_predY = mean(m_predY), -->
+<!--     se_m_predY = sd(m_predY) / sqrt(n - 1), -->
+<!--     m_m_RP = mean(m_RP), -->
+<!--     se_m_RP = sd(m_RP) / sqrt(n-1) -->
+<!--   ) -->
+<!-- predY_mix -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- predY_mix$m_rpErr = predY_mix$m_m_predY - predY_mix$m_m_RP -->
+<!-- predY_mix$m_relativeErr = predY_mix$m_rpErr / predY_mix$targetDur -->
+<!-- ``` -->
+
+<!-- ### The predication of mixed block -->
+
+<!-- ```{r} -->
+<!-- #plot Error in mixed blocks -->
+<!-- ggplot(data=predY_mix, aes(x= targetDur, y=m_rpErr, group = model, color= model)) +  -->
+<!--   geom_bar(stat="identity")+ -->
+<!--   labs(x="target intervals", y="Error (predicted RP minus measured reproduction)")+ -->
+<!--   facet_wrap(Exp~model) + -->
+<!--   theme_new -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- #plot relative Error for mixed blocks -->
+<!-- fig_rerr_model <-  ggplot(data=predY_mix, aes(x= targetDur, y=m_relativeErr*100, group = model, color= model)) +  -->
+<!--   geom_bar(stat="identity")+ -->
+<!--   labs(x="target intervals", y="relative error (%)")+ -->
+<!--   facet_wrap(Exp~model) + -->
+<!--   theme_new -->
+
+<!-- ggsave(file.path('figures','fig_rerr_model.png'), fig_rerr_model, width = 7, height = 5) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- #plot the average of the predicted Y under the mixed condition -->
+<!-- fig_mPredY_mix = ggplot(predY_mix) +  -->
+<!--   geom_point(aes(targetDur, m_m_predY, group = model, color = model)) +  -->
+<!--   geom_line(aes(targetDur, m_m_RP, group = model, color = model),  size = 1) +  -->
+<!--   #geom_errorbar(aes(ymin = m_m_predY-se_m_predY, ymax = m_m_predY + se_m_predY), width = 0.05) +  -->
+<!--   geom_abline(slope = 1, linetype = 2, size = 1) + # add diagonal line -->
+<!--   facet_wrap(~Exp) + -->
+<!--   guides(color = guide_legend(title = element_blank())) + # remove legend title -->
+<!--   theme_classic() +  -->
+<!--   theme(strip.background = element_blank()) + # remove subtitle background -->
+<!--   labs(x = "Durations (secs)", y = "Mean Reproductions (secs)", size =15) + theme(legend.position="bottom")+ -->
+<!--   theme_new -->
+
+<!-- fig_mPredY_mix -->
+
+
+<!-- ggsave(file.path('figures','fig_mPredY_mix.png'), fig_mPredY_mix, width = 7, height = 5) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- predY_mix$rpErr_squared <- predY_mix$m_rpErr^2 -->
+<!-- m_predY_Err <- dplyr::group_by(predY_mix, Exp, model) %>% -->
+<!--   dplyr::summarize(sum_rpErr = sum(rpErr_squared),  -->
+<!--                    n = n()) -->
+
+<!-- fig_rpErr_model <- ggplot(m_predY_Err, aes(x = Exp, y = sum_rpErr, color = model, fill = model, group = model)) +  -->
+<!--   geom_bar(stat = "identity", -->
+<!--            position = position_dodge()) + theme(legend.position="bottom")+ -->
+<!--   theme_new -->
+
+<!-- ggsave(file.path('figures','fig_rpErr_model.png'), fig_rpErr_model, width = 7, height = 5) -->
+
+<!-- fig_rpErr_model -->
+<!-- ``` -->
+
+### load result data (V3)
+
+```{r include=FALSE}
+AllDat_Bayparlist3 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_Bayparlist_V3.csv"))
+AllDat_predY_mix3 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_predY_mix_V3.csv"))
+AllDat_predY_s3 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_predY_s_V3.csv"))
+AllDat_predY_l3 <- read_csv(paste0(rstanmodelPath, "/rlt/AllDat_predY_l_V3.csv"))
+AllDat_predY <- rbind(AllDat_predY_mix3, AllDat_predY_s3)
+AllDat_predY <- rbind(AllDat_predY, AllDat_predY_l3)
+AllDat_predY$group = factor(AllDat_predY$group, labels = c("short", "long", "mix"))
+```
+
+
+
+### Analysis on the Rstan model parameters
+
+#### Parameters
+```{r}
+m_Baypar <- dplyr::group_by(AllDat_Bayparlist3, Nsub,Exp, model) %>%
+  dplyr::summarize(m_wf1 = mean(wf1), m_wf2 = mean(wf2),
+                   m_wf3 = mean(wf3), m_wf_sm =mean(wf_sm),
+                   m_mu1 = mean(mu1), m_mu2 = mean(mu2), m_mu3 = mean(mu3), 
+                   m_sig_m_square =mean(sig_m_square)) 
+m_Baypar
+```
+
+
+####  wf in models
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_wf1, color = model, fill = model, group = model)) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_wf2, color = model, fill = model, group = model)) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_wf3, color = model, fill = model, group = model)) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_wf_sm, color = model, fill = model, group = model)) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+
+#### means of the prior
+
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_mu1, color = model, fill = model, group = model)) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_mu2, color = model, fill = model, group = model)) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_mu3, color = model, fill = model, group = model)) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+
+#### motor noise
+
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_sig_m_square, color = model, fill = model, group = model)) + 
+    geom_bar(stat = "identity",
+           position = position_dodge()) +
+  facet_grid(~Nsub)+
+  theme_new
+```
+
+
+#### Prediction results
+
+```{r}
+predY <- group_by(AllDat_predY, targetDur, Exp, NSub, model, group) %>%
+  summarize(m_RP = mean(RP), n = n(), 
+            sd_RP = sd(RP)/ sqrt(n-1),
+            m_predY = mean(predY), 
+            sd_predY = sd(predY)/ sqrt(n-1))
+
+predY$m_rpErr = predY$m_predY - predY$m_RP
+predY$m_relativeErr = predY$m_rpErr / predY$targetDur
+```
+
+```{r}
+m_predY <- predY%>%
+ group_by(targetDur, Exp, model, group)%>%
+  summarize(
+    n = n(),
+    m_m_predY = mean(m_predY),
+    se_m_predY = sd(m_predY) / sqrt(n - 1),
+    m_m_RP = mean(m_RP),
+    se_m_RP = sd(m_RP) / sqrt(n-1)
+  )
+```
+
+
+```{r}
+#plot Error in mixed blocks
+ggplot(data=predY, aes(x= targetDur, y=m_rpErr, group = factor(NSub), color= factor(NSub))) + 
+  geom_point()+
+  geom_line()+
+labs(x="target intervals", y="Error (predicted RP minus measured reproduction)")+
+facet_wrap(group+Exp~ model)+ 
+  theme_new
+```
+
+
+```{r}
+#plot Error in mixed blocks
+ggplot(data=predY, aes(x= targetDur, y=m_rpErr, group = factor(NSub), color= factor(NSub))) + 
+  geom_bar(stat="identity")+
+  labs(x="target intervals", y="Error (predicted RP minus measured reproduction)")+
+  facet_wrap(group+Exp~model) +
+  theme_new
+```
+
+
+```{r}
+#plot relative Error for mixed blocks
+fig_rerr_model <-  ggplot(data=predY, aes(x= targetDur, y=m_relativeErr*100, group = factor(NSub), color= factor(NSub))) + 
+  geom_bar(stat="identity")+
+  labs(x="target intervals", y="relative error (%)")+
+  facet_wrap(group+Exp~model) +
+  theme_new
+fig_rerr_model
+ggsave(file.path('figures','fig_rerr_model.png'), fig_rerr_model, width = 7, height = 5)
+```
+
+
+```{r}
+#plot the average of the predicted Y under the mixed condition
+fig_mpredY = ggplot(m_predY) + 
+  geom_point(aes(targetDur, m_m_predY, group = Exp, color = Exp)) + 
+  geom_line(aes(targetDur, m_m_RP, group = Exp, color = factor(Exp)),  size = 0.2) + 
+  geom_point(aes(targetDur, m_m_RP, group = Exp, color = factor(Exp)),  size = 1, shape = 0) + 
+  geom_abline(slope = 1, linetype = 2, size = 1) + # add diagonal line
+  facet_wrap(model~group) +
+  guides(color = guide_legend(title = element_blank())) + # remove legend title
+  theme_classic() + 
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = "Durations (secs)", y = "Mean Reproductions (secs)", size =15) + theme(legend.position="bottom")+
+  theme_new
+
+fig_mpredY
+
+
+ggsave(file.path('figures','fig_mpredY_V3.png'), fig_mpredY, width = 7, height = 5)
+```
+
+```{r}
+predY$rpErr_squared <- predY$m_rpErr^2
+m_predY_Err <- dplyr::group_by(predY, Exp, model, group) %>%
+  dplyr::summarize(sum_rpErr = sum(rpErr_squared), 
+                   n = n())
+
+fig_rpErr_model <- ggplot(m_predY_Err, aes(x = group, y = sum_rpErr, color = model, fill = model, group = model )) + 
+  geom_bar(stat = "identity",
+           position = position_dodge()) + theme(legend.position="bottom")+
+  facet_wrap(Exp~.) +
+  theme_new
+
+ggsave(file.path('figures','fig_rpErr_model.png'), fig_rpErr_model, width = 7, height = 5)
+
+fig_rpErr_model
+```
+

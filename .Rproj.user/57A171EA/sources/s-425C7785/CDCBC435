@@ -1,0 +1,27 @@
+{
+    "id": "CDCBC435",
+    "path": "~/mlabRepository/PriorsIntegration/3ModelReport_log.Rmd",
+    "project_path": "3ModelReport_log.Rmd",
+    "type": "r_markdown",
+    "hash": "3007972201",
+    "contents": "",
+    "dirty": false,
+    "created": 1647542459114.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "327,51",
+        "scrollLine": "326",
+        "last_setup_crc32": "425C7785bb338d19"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1647788840,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1647788840582,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,10 @@
+"0","sumexp1Sub = sumexpSub %>% filter(Exp == 'Exp1')"
+"0","sumexp2Sub = sumexpSub %>% filter(Exp == 'Exp2')"
+"0",""
+"0","mRepAnova_exp1 <- ezANOVA(data = sumexp1Sub, dv= m_RP, wid=NSub, within=.(priortype, targetDur))"
+"2","Warning:"
+"2"," ""targetDur"" will be treated as numeric.
+"
+"2","Error in ezANOVA_main(data = data, dv = dv, wid = wid, within = within,  : 
+  One or more cells is missing data. Try using ezDesign() to check your data.
+"

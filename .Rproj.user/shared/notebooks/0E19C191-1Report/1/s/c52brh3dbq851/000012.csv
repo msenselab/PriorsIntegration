@@ -1,0 +1,5 @@
+"0","# load all data"
+"0","allexpdat <- readAllData(paste0(getwd(), '/data/AllExpData.csv'), FALSE, FALSE)"
+"0","allexpdat$targetDur <-  round(allexpdat$targetDur,3) "
+"0","Exp_session_order = distinct(allexpdat %>%dplyr::select(Exp, NSub, firstSession))"
+"0","write_csv(Exp_session_order, paste0(getwd(), '/data/Exp_session_order.csv') )"

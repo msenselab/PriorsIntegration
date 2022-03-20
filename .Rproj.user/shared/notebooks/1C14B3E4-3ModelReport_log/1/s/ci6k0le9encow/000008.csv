@@ -1,0 +1,17 @@
+"0","AllDat_Bayparlist_2part%>%filter(model !='IP') %>% dplyr::group_by(Exp, model, part) %>% "
+"0","  dplyr::summarize(m_sig2_p_g = mean(sig2_p_g), n = n(), se = sd(sig2_p_g)/sqrt(n-1)) %>%"
+"0","  ggplot(aes(model, m_sig2_p_g, ymin = m_sig2_p_g - se, ymax = m_sig2_p_g + se, group = interaction(Exp, model, part), color = part, shape = model))+ "
+"0","  geom_line(stat = ""identity"",position = position_dodge(width = 0.2))+"
+"0","  geom_point(stat = ""identity"",position = position_dodge(width = 0.2))+ "
+"0","  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +"
+"0","  labs(x = "" "", y = ""Variance of global prior"") +"
+"0","  theme_minimal()+ theme_new + facet_wrap(~Exp)+"
+"0","  scale_color_manual(values = mycolors)"
+"1","`summarise()` has grouped output by 'Exp', 'model'. You can override using the `.groups` argument.
+"
+"2","geom_path: Each group consists of only one observation. Do you need to
+adjust the group aesthetic?
+"
+"2","geom_path: Each group consists of only one observation. Do you need to
+adjust the group aesthetic?
+"

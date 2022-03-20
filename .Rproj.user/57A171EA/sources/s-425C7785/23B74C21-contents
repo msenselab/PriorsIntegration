@@ -1,0 +1,1110 @@
+---
+title: "statistical results on behavioral data "
+author: "Fiona Zhu"
+date: "10/27/2020"
+output:
+  html_document:
+    df_print: paged
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load functions and packages{-}
+
+```{r include=FALSE}
+source('ana_functions.R')
+library(BayesFactor)
+library('ggridges')
+#customize theme
+source('mytheme.R') 
+```
+
+# Introduction
+To estimate mean priors from the separate interval groups (the short and long ranges, and mixed ranges. we adopted the left and right spatial separation for the short and long ranges, as used in Roach et al. (2017).
+
+![Procedure](images/timeline.png){width=60%}
+
+## distribution of each session
+
+```{r include=FALSE}
+Exp_dist_dat <- read_csv("data/Exp_dist.csv")
+Exp_dist_dat$group = factor(Exp_dist_dat$group, levels = c(1, 2, 3), labels = c('short','long','mix'))
+Exp_dist_dat$targetDur = Exp_dist_dat$targetDur*1000
+Exp_dist = Exp_dist_dat %>% dplyr::group_by(Exp, group)%>%dplyr::summarise(n =n(),mDur = mean(targetDur), sd_Dur = sd(targetDur),  gm_Dur = gm_mean(targetDur), log_sd =sd(log(targetDur)))
+Exp_dist
+```
+
+
+# Central tendency analysis
+
+```{r}
+# load all data
+allexpdat <- readAllData(paste0(getwd(), '/data/AllExpData.csv'), FALSE, FALSE)
+allexpdat$targetDur <-  round(allexpdat$targetDur,3) 
+Exp_session_order = distinct(allexpdat %>%dplyr::select(Exp, NSub, firstSession))
+write_csv(Exp_session_order, paste0(getwd(), '/data/Exp_session_order.csv') )
+```
+
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+# load valid data
+exps <- readAllData(paste0(getwd(), '/data/AllExpData.csv'), TRUE, TRUE)
+exps$BIAS = abs(exps$repError)
+exps$rerr = exps$repError/exps$targetDur
+exps$Exp = as.factor(exps$Exp)
+exps$NSub = as.factor(exps$NSub)
+write.csv(exps, file = paste0(getwd(), "/data/AllExpData_valid.csv"))
+```
+
+```{r}
+gp_var_prior= c("NSub", "targetDur", "Exp", "priortype", "range")
+sumexpSub <-summarizedata(exps, gp_var_prior)
+##separate data set 
+sumexp <- summarizeMeanData(exps, gp_var_prior)
+m_sumexp <-  mm_summarizedata(exps, gp_var_prior)
+m_exp_sub <- summarizeMeanData(exps, c("targetDur","NSub", "Exp", "priortype", "range"))
+```
+
+
+## Experiment 1 
+
+In exp1, the target intervals are the ramdomly selected elements from three groups of time intervals: group short (400-800ms), group long (1200-1600ms), and a mixed group(400-800ms, 1200-1600ms). 
+
+The experiment consisted of three sessions with each had 160 trials.
+The time intervals in short group are 400, 475.7, 565.7, 672.7, 800ms.  The time intervals in long group are 1.2, 1.4, 1.9, 2.02, and 2.4s. The short and long ranges were separated by 400 ms. The order between short group and long group was counterbalanced across participants. The mixed group is always the last session.
+
+In exp1, there are one practice block and 24 formal blocks. Each block has 20 trials. The duration of the circle displayed on the screen is the interval that participants need to replicate. By pressing left button (Mouse) to reproduce the time duration as long as stimulus was presented. Participants received feedback after their response.
+
+In Exp1, the intervals from short-range were spaced logarithmically between 400 and 800 ms,  with a mean of 583 ms, a standard deviation (SD) of 142.2 ms;  the intervals from long-range were spaced logarithmically between 1200 and 2400 ms, with a mean of 1752ms and a standard deviation (SD) of 427.0 ms; distribution of intervals for the mix session had a mean of 1166ms and a standard deviation (SD) of 665.5ms. 
+
+###  Central tendency analysis
+
+It is a reproduction task, so first we examine the reproduction error and the central tendency effect. We plot two types of colors separately, and separate for individual subjects. 
+
+```{r}
+ggplot(sumexpSub %>% dplyr::filter(Exp == 'Exp1'), aes(targetDur, m_RP, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(alpha = 0.5) +
+  geom_line()+
+  geom_abline(intercept = 0, slope = 1, linetype=3, size =0.2) +
+  facet_wrap(~NSub) +
+  ylim(0, 3) +
+  labs(x = 'Target Duration (s)', y='Reproduction (s)',  shape= 'range', color='condition') + 
+  theme_new+
+  scale_color_manual(values = mycolors) +
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10')+#Transform x axis to log10 scale
+  theme(legend.position='bottom')
+```
+```{r}
+fig_mRep_exp1 = ggplot(sumexp %>%  dplyr::filter(Exp == 'Exp1'),
+                       aes(targetDur, m_m_RP, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(size = 0.5) + 
+  geom_line(data = sumexp %>%  dplyr::filter(Exp == 'Exp1')) + 
+  geom_errorbar(aes(ymin = m_m_RP- m_se_err , ymax = m_m_RP + m_se_err), width = 0.02) + 
+  geom_abline(slope = 1, linetype=3, size =0.2) + # add diagonal line
+  facet_wrap(~Exp) +
+  theme_new + scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Mean Reproductions (s)', shape= 'range', color='condition')+ theme(legend.position='bottom')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+ggsave(file.path('figures','fig_mRep_exp1_priortype.png'), fig_mRep_exp1, width = 7, height = 5)
+# plot relative bias
+fig_mRep_exp1
+```
+
+### Reproduction Error
+
+```{r}
+ggplot(sumexpSub %>% dplyr::filter(Exp == 'Exp1'), aes(targetDur, m_err, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(alpha = 0.5) + 
+  geom_line()+
+  geom_hline(yintercept = 0, linetype=3, size =0.2) +
+  facet_wrap(~NSub) +
+  labs(x ='Target Duration (s)', y ='Repr. Error (s)',  shape= 'range', color='condition') + theme(legend.position='bottom') + 
+  scale_x_continuous(trans='log10')+
+  theme_new+scale_color_manual(values = mycolors) 
+```
+
+
+
+## Experiment 2 
+
+In this experiment, the short and long ranges were clearly separate. The experiment consisted of three sessions with each had 160 trials. The time intervals used in Exp.2 in short group were chosen from 491.2, 542.9, 600, 663, 732.8 ms, and target intervals in long group were chosen from 1.31, 1.45, 1.60, 1.77 and 1.954s. The short (491.2-732.8ms) and long (1310-1954ms) ranges were separated by 577 ms. The order between short group and long group was counterbalanced across participants. The mixed group is always the last session.
+
+In exp2, there are one practice block and 16 formal blocks. Each block has 30 trials. The duration of the circle displayed on the screen is the interval that participants need to replicate. By pressing left button (Mouse) to reproduce the time duration as long as stimulus was presented. Participants received feedback after their response.
+
+###  Central trendency
+
+```{r}
+ggplot(sumexpSub %>% dplyr::filter(Exp == 'Exp2'), aes(targetDur, m_RP, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(alpha = 0.5) + 
+  geom_line()+
+  ylim(0, 3)+
+  geom_abline(intercept = 0, slope = 1, linetype=3, size =0.2) +
+  #geom_smooth(se = FALSE, method = 'lm') +
+  facet_wrap(~NSub) +
+  labs(x ='Target Duration (s)', y='Reproduction (s)', shape= 'range', color='condition') + theme_new + theme(legend.position='bottom')+
+  scale_color_manual(values = mycolors) +
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+```
+
+###  Reproduction Error
+
+```{r}
+ggplot(sumexpSub %>% dplyr::filter(Exp == 'Exp2'), aes(targetDur, m_err, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(alpha = 0.5) + 
+  geom_line()+
+  #geom_smooth(se = FALSE, method = 'lm') + 
+  geom_hline(yintercept = 0, linetype=3, size =0.2) +
+  facet_wrap(~NSub) +
+  labs(x = 'Target Duration (s)', y ='Repr. Error (s)', shape= 'range', color='condition') + theme(legend.position='bottom')+ 
+  theme_new+scale_color_manual(values = mycolors) +
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+```
+
+### plot mean reproduction
+
+```{r}
+fig_mRep_exp2 = ggplot(sumexp %>%  dplyr::filter(Exp == 'Exp2'),
+                       aes(targetDur, m_m_RP, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(size = 2) + 
+  geom_line(data = sumexp %>%  dplyr::filter(Exp == 'Exp2')) + 
+  geom_errorbar(aes(ymin = m_m_RP-m_se_err, ymax = m_m_RP + m_se_err), width = 0.02) + 
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line
+  facet_wrap(~Exp) +
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'Mean Reproductions (s)', shape= 'range', color='condition')+ theme(legend.position='bottom')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+ggsave(file.path('figures','fig_mRep_exp2.png'), fig_mRep_exp2, width = 7, height = 5)
+fig_mRep_exp2
+```
+
+
+# Analysis the difference of reproduction between IR and BR 
+
+```{r}
+#calculate the difference between IR and BR 
+sumexpSub_diff <- dplyr::select(sumexpSub, NSub, targetDur, Exp, priortype, range, m_err, m_RP, sd_err, sd_RP)%>%
+    unite(values, m_err, m_RP, sd_err, sd_RP)%>%
+    spread(priortype, values)%>%
+    separate(`IR`, c("IR_err", "IR_RP", "IR_sd_err","IR_sd_RP"), sep = "_")%>%
+    separate(`BR`, c("BR_err", "BR_RP", "BR_sd_err","BR_sd_RP"), sep = "_")
+sumexpSub_diff$IR_err = as.numeric(sumexpSub_diff$IR_err)
+sumexpSub_diff$BR_err = as.numeric(sumexpSub_diff$BR_err)
+sumexpSub_diff$IR_RP = as.numeric(sumexpSub_diff$IR_RP)
+sumexpSub_diff$BR_RP = as.numeric(sumexpSub_diff$BR_RP)
+sumexpSub_diff$IR_sd_err = as.numeric(sumexpSub_diff$IR_sd_err)
+sumexpSub_diff$BR_sd_err = as.numeric(sumexpSub_diff$BR_sd_err)
+sumexpSub_diff$IR_sd_RP = as.numeric(sumexpSub_diff$IR_sd_RP)
+sumexpSub_diff$BR_sd_RP = as.numeric(sumexpSub_diff$BR_sd_RP)
+sumexpSub_diff$diff_RP = sumexpSub_diff$IR_RP - sumexpSub_diff$BR_RP
+sumexpSub_diff$diff_sd_RP = sumexpSub_diff$IR_sd_RP - sumexpSub_diff$BR_sd_RP
+#Normalized
+sumexpSub_diff$diff_RP_Normalized = sumexpSub_diff$diff_RP/ sumexpSub_diff$targetDur
+sumexpSub_diff$diff_RP_Normalized_abs= abs(sumexpSub_diff$diff_RP_Normalized)
+
+sumexpSub_diff_range= sumexpSub_diff %>%group_by(NSub, Exp, range) %>%
+  dplyr::summarize(m_diff_RP_Normalized = mean(diff_RP_Normalized),
+                   m_diff_RP_Normalized_abs = mean(diff_RP_Normalized_abs))
+
+write.csv(sumexpSub_diff, file = paste0("generated/sumexpSub_diff.csv"))
+write.csv(sumexpSub_diff_range, file = paste0("generated/sumexpSub_diff_range.csv"))
+
+```
+
+```{r}
+m_sumexpSub_diff <- sumexpSub_diff %>% dplyr::group_by(targetDur, Exp) %>%
+    dplyr::summarise(m_diff_RP = mean(diff_RP), 
+                     n= n(), m_diff_sd_RP = mean(diff_sd_RP), 
+                     m_diff_RP_Normalized = mean(diff_RP_Normalized), 
+                     sd_diff_RP = sd(diff_RP), m_diff_sd_RP_Normalized = sd(diff_RP_Normalized))
+```
+
+### plot RP difference between IR and BR
+
+
+```{r}
+# Mean reproduction difference between IR and BR
+fig_diff_RP_exp1 = ggplot(m_sumexpSub_diff %>% filter(Exp == "Exp1"), aes(targetDur, m_diff_RP)) + 
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = m_diff_RP-m_diff_sd_RP, ymax = m_diff_RP + m_diff_sd_RP), width = 0.02) + 
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_new+ #scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'RP difference IR vs. BR (s)', shape= 'range', color='condition')+ 
+  theme(legend.position='bottom')+
+  #scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_diff_RP_exp1
+```
+```{r}
+# Mean reproduction difference between IR and BR
+fig_diff_RP_exp2 = ggplot(m_sumexpSub_diff %>% filter(Exp == "Exp2"), aes(targetDur, m_diff_RP)) + 
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = m_diff_RP-m_diff_sd_RP, ymax = m_diff_RP + m_diff_sd_RP), width = 0.02) +
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_new+ #scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'RP difference IR vs. BR (s)', shape= 'range', color='condition')+ 
+  theme(legend.position='bottom')+
+  #scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_diff_RP_exp2
+```
+
+
+
+
+```{r}
+# Mean reproduction difference between IR and BR
+fig_diff_RP = ggplot(m_sumexpSub_diff, aes(targetDur, m_diff_RP)) + 
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = m_diff_RP-m_diff_sd_RP, ymax = m_diff_RP + m_diff_sd_RP), width = 0.02) + 
+  facet_wrap(~Exp) +
+  theme_new+ #scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'Mean reproduction difference between IR and BR (s)', shape= 'range', color='condition')+ 
+  theme(legend.position='bottom')+
+  #scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_diff_RP
+```
+
+
+
+```{r}
+# Mean reproduction difference between IR and BR
+fig_diff_RP_exp1_Normalized = ggplot(m_sumexpSub_diff %>% filter(Exp == "Exp1"), aes(targetDur, m_diff_RP_Normalized)) + 
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = m_diff_RP_Normalized-m_diff_sd_RP_Normalized, ymax = m_diff_RP_Normalized + m_diff_sd_RP_Normalized), width = 0.02) + 
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_new+ #scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'NMRD between IR and BR', shape= 'range', color='condition')+ 
+  theme(legend.position='bottom')+
+  #scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_diff_RP_exp1
+```
+```{r}
+# Mean reproduction difference between IR and BR
+fig_diff_RP_exp2_Normalized = ggplot(m_sumexpSub_diff %>% filter(Exp == "Exp2"), aes(targetDur, m_diff_RP_Normalized)) + 
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = m_diff_RP_Normalized-m_diff_sd_RP_Normalized, ymax = m_diff_RP_Normalized + m_diff_sd_RP_Normalized), width = 0.02) +
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_new+ #scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'NMRD between IR and BR', shape= 'range', color='condition')+ 
+  theme(legend.position='bottom')+
+  #scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_diff_RP_exp2_Normalized
+```
+
+
+# plot reproduction results
+
+## plot scatter reproduction
+
+```{r}
+fig_mRep_exp_scatter_exp1 = ggplot(exps %>% filter(Exp == 'Exp1'),
+                                   aes(targetDur, RP, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(size = 0.3, position = position_dodge(width = 0.04), alpha=0.3) + 
+  geom_point(data =sumexp %>% filter(Exp =='Exp1'), aes(targetDur, m_m_RP, group = interaction(priortype, range), color = priortype, shape = range),  position = position_dodge(width = 0.04)) + 
+  geom_line(data =sumexp%>% filter(Exp %in% c('Exp1')), aes(targetDur, m_m_RP, group = interaction(priortype, range), color = priortype, shape = range))+ 
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line+
+  theme_new+ 
+  scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals in Exp.1 (s)', y = 'Reproduction in Exp1 (s)', shape= 'Range', color='Condition')+
+  theme(legend.position = 'none')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRep_exp_scatter_exp1
+```
+
+
+```{r}
+fig_mRep_exp_scatter_exp2 = ggplot(exps %>% filter(Exp == 'Exp2'),
+                                   aes(targetDur, RP, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point(size = 0.3, position = position_dodge(width = 0.04), alpha=0.3) + 
+  geom_point(data = sumexp %>% filter(Exp =='Exp2'), aes(targetDur, m_m_RP, group = interaction(priortype, range), color = priortype), position = position_dodge(width = 0.04)) + 
+  geom_line(data =sumexp%>% filter(Exp %in% c('Exp2')), aes(targetDur, m_m_RP, group = interaction(priortype, range), color = priortype))+
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line+
+  theme_new+ 
+  scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals in Exp.2 (s)', y = 'Reproduction in Exp.2 (s)', shape= 'range', color='condition')+
+  theme(legend.position = 'none')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRep_exp_scatter_exp2
+```
+
+
+## observed CV for each subject
+
+```{r}
+m_expSub <- sumexpSub %>% dplyr::group_by(targetDur, Exp, priortype, range) %>%
+    dplyr::summarize(m_CV= mean(CV))
+
+fig_NBIAS_CV_sub= ggplot(sumexpSub, aes(targetDur, CV, group = interaction(priortype, range), color = priortype, shape = range))+
+  geom_point(alpha = 0.5, size =0.4)+
+  geom_point(m_expSub, mapping = aes(targetDur, m_CV, group = interaction(priortype, range), color = priortype, shape = range), size = 2)+
+  geom_line(m_expSub, mapping = aes(targetDur, m_CV, group = interaction(priortype, range), color = priortype, shape = range))+
+  theme_new+ 
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Sample intervals', y = 'Coefficient of Variation (CV)')+
+  theme(legend.position='bottom')+theme(legend.title = element_blank())+
+  scale_shape_manual(values=c(15, 16))+
+  facet_wrap(~Exp, ncol = 1)+
+  scale_color_manual(values = mycolors) 
+  
+ggsave(file.path('figures','fig_NBIAS_CV_sub.png'), fig_NBIAS_CV_sub, width = 4, height = 8)
+
+fig_NBIAS_CV_sub
+```
+
+
+## observed BIAS vs. CV
+
+```{r}
+# prepare the data to draw circles
+rmax = 0.4
+theta=seq(from=0,by=.01,to=2*pi)
+ncirc=8
+dat.circ = do.call(rbind,
+                   lapply(seq_len(ncirc), function(n){
+                     r <- n*rmax/ncirc
+                     data.frame(m_m_BIAS=r*sin(theta), m_NBIAS=r*sin(theta),  m_CV=r*cos(theta), m_cv=r*cos(theta), m_NBIAS=r*sin(theta), m_NRMSE=r*cos(theta), m_NRMSE=r*cos(theta),
+                                m_m_err=r*sin(theta), m_sd_RP=r*cos(theta), r=round(r,2))}))
+dat.circ1 = dat.circ %>% filter(m_m_BIAS>=0, m_CV >=0)
+dat.circ1$priortype = 'BR'
+dat.circ1$range = 'short'
+dat.circ1$m_sd_CV =0.1
+```
+
+
+```{r}
+fig_NBIAS_CV_pr=  ggplot(m_exp_sub, aes(m_NBIAS, m_CV, group = interaction(priortype, range), color = priortype, shape = range))+
+  geom_abline(slope = 1, linetype = 2) +
+  geom_point(alpha = 0.8, size =0.7)+
+  geom_point(m_sumexp, mapping = aes(m_NBIAS, m_CV,  group = interaction(priortype, range), color = priortype, shape = range), size = 3)+#
+  geom_errorbar(data = m_sumexp, aes(ymin = m_CV-se_CV, ymax = m_CV + se_CV), width = 0.02) + 
+  geom_errorbarh(data = m_sumexp, aes(xmin = m_NBIAS-m_se_BIAS, xmax = m_NBIAS + m_se_BIAS), height = .015)+ 
+  geom_path(data=dat.circ1, alpha=.1, aes(group=factor(r)))+
+  theme_new+ #scale_color_manual(values = mycolors4) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'NBIAS', y = 'Coefficient of Variation (CV)')+
+  theme(legend.position='bottom')+theme(legend.title = element_blank())+
+  scale_shape_manual(values=c(15,16))+
+  facet_wrap(~Exp, ncol = 1)+
+  xlim(0, rmax) + ylim(0, rmax)+
+  scale_color_manual(values = mycolors) 
+  
+ggsave(file.path('figures','fig_NBIAS_CV_pr.png'), fig_NBIAS_CV_pr, width = 3, height = 8)
+
+fig_NBIAS_CV_pr
+```
+
+
+
+```{r}
+fig_CV<- ggarrange(fig_NBIAS_CV_sub,  fig_NBIAS_CV_pr, common.legend = TRUE, legend = "bottom", ncol = 2, nrow =1)
+ggsave(file.path('figures', '/figures/fig_CV.png'), fig_CV, width = 7, height = 8)
+
+fig_CV
+```
+
+## slope of CV
+
+```{r}
+cvSlope_model <- function(df) {
+  lm(CV ~ targetDur, data = df)
+}
+
+CVslopes <- sumexpSub %>% 
+  dplyr::group_by(NSub, Exp, priortype, range) %>% nest()  %>%  # nested data
+  mutate(model = map(data, cvSlope_model)) %>%  # linear regression
+  mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+  unnest(slope, .drop = TRUE) %>% # remove raw data
+  select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, slope = targetDur)  # rename columns
+CVslopes$data <- NULL
+CVslopes$model <- NULL
+```
+
+
+
+##  mean reproduction error
+
+```{r}
+fig_mrepError_pr_exp1 = ggplot(sumexp%>%filter(Exp=='Exp1'),
+                          aes(targetDur, 
+                              m_m_err, 
+                              group = interaction(priortype,range),
+                              color = priortype,
+                              shape = range)) + 
+  geom_point() +geom_line()+
+  geom_errorbar(aes(ymin = m_m_err-m_se_err, ymax = m_m_err + m_se_err), width = 0.03) + 
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_new+ 
+  scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals in Exp1 (s)', y = 'Reproduction Error (s)', shape= 'range', color='condition')+ theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') +#Transform x axis to log10 scale
+  ylim(-0.5, 0.2)
+
+
+fig_mrepError_pr_exp1
+```
+
+```{r}
+fig_mrepError_pr_exp2 = ggplot(sumexp%>%filter(Exp=='Exp2'),
+                          aes(targetDur, 
+                              m_m_err, 
+                              group = interaction(priortype,range),
+                              color = priortype,
+                              shape = range)) + 
+  geom_point() +geom_line()+
+  geom_errorbar(aes(ymin = m_m_err-m_se_err, ymax = m_m_err + m_se_err), width = 0.03) + 
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_new+ 
+  scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals in Exp.2 (s)', y = 'Reproduction Error (s)', shape= 'range', color='condition')+ theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10')+ #Transform x axis to log10 scale#
+  ylim(-0.5, 0.2)
+
+fig_mrepError_pr_exp2
+```
+
+```{r}
+fig_mrepError_pr = ggplot(sumexp,
+                          aes(targetDur, 
+                              m_m_err, 
+                              group = interaction(priortype,range),
+                              color = priortype,
+                              shape = range)) + 
+  geom_point() +geom_line()+
+  geom_errorbar(aes(ymin = m_m_err-m_se_err, ymax = m_m_err + m_se_err), width = 0.03) + 
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_new+ 
+  scale_color_manual(values = mycolors) +
+  facet_wrap(~Exp)+
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'Reproduction Error (s)', shape= 'range', color='condition')+ theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+ggsave(file.path('figures','fig_mrepError_pr.png'), fig_mrepError_pr, width = 7, height = 4)
+fig_mrepError_pr
+```
+
+##  slopes and indifference points
+
+
+### slopes and CI categoried by 3 sessions(short, long, mix)
+
+```{r}
+slope_group = exps%>% dplyr::group_by(NSub, Exp, group) %>% nest()  %>% 
+    mutate(model = map(data, mRep_model)) %>%  # linear regression
+    mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+    unnest(slope, .drop = TRUE) %>% # remove raw data
+    select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+    spread(term, estimate) %>%   # spread stimates
+    dplyr::rename(minRP = `(Intercept)`, slope = targetDur)  # rename columns
+slope_group$data = NULL
+slope_group$model = NULL
+slope_group$inP = slope_group$minRP/(1-slope_group$slope)
+slope_group$CI= 1-slope_group$slope
+```
+
+
+```{r}
+mslope_group = slope_group %>%
+    group_by(Exp, group) %>% 
+    dplyr::summarise(m_slope = mean(slope),
+                     m_CI = mean(CI),
+                     m_minRP = mean(minRP),
+                     m_inP = mean(inP),
+                     n = n(), 
+                     se_slope = sd(slope)/ sqrt(n-1),
+                     se_CI = sd(CI)/sqrt(n-1))
+```
+
+```{r}
+mslope_group = left_join(mslope_group, Exp_dist, by = c("Exp", "group") )
+mslope_group$n.x = NULL
+mslope_group$n.y = NULL
+mslope_group_melt <- reshape2::melt(mslope_group%>% select(Exp, group, m_inP, mDur, sd_Dur, gm_Dur), id.vars = c("Exp", "group"), variables.name = "type", value.name =  "value")
+```
+
+
+### slopes and CI based on prior condition and range (IR vs. BR, short vs. long)
+
+```{r}
+# get the slopes and indifference points for each subject
+gp_var_pr = c('NSub', 'Exp', 'priortype', 'range')
+slope_pr = getSlope(exps, gp_var_pr)
+slope_pr$CI= 1-slope_pr$slope
+# # display the outliers according to indifference points
+# slope_pr%>% filter(inPOutlier == TRUE)
+```
+
+```{r}
+### calculate indifference points (average)
+mslope_pr = getmSlope(exps, gp_var_pr)  # averaged slopes and InP across subjects after removing outliers
+head(mslope_pr)
+```
+```{r}
+mslope_pr$range <- factor(mslope_pr$range, levels = c("short", "long"))
+mslope_pr <-mslope_pr[order(mslope_pr$range),]
+mslope_pr
+```
+
+```{r}
+mm_slope_pr <- getmmSlope(sumexp, gp_var_pr[2:length(gp_var_pr)])
+```
+
+##  plot slop and InP
+
+```{r}
+##for plot the extend lines
+temp_xy<- sumexp%>% filter(targetDur == 0.8  | targetDur ==0.7328000| targetDur ==1.3100000)%>% filter(priortype == 'IR') %>% group_by(Exp, targetDur, priortype, range) %>%
+  dplyr::summarise(x = targetDur,
+                   y = m_m_RP)
+temp_slope_pr = mm_slope_pr[, c("Exp", "priortype", "range", "inP", "slope", "minRP")]
+temp_xy = left_join(temp_xy, temp_slope_pr, by = c("Exp", "priortype", "range"))
+temp_xy
+```
+
+
+```{r}
+mslope_pr = left_join(mslope_pr, temp_slope_pr, by = c("Exp", "priortype", "range"))
+mslope_pr$y = 0.02
+mslope_pr[which(mslope_pr$priortype == 'IR'),"y"] = 0.2
+mslope_pr$targetDur = mslope_pr$y
+mslope_pr$m_m_RP = mslope_pr$y
+```
+
+```{r}
+##plot slope lines
+fitMeanRP <- sumexp %>% group_by(Exp, priortype, range) %>%
+  dplyr::summarise(minDur = min(targetDur),
+                   maxDur= max(targetDur))
+
+fitMeanRP <- left_join(fitMeanRP, temp_slope_pr, by = c("Exp", "priortype", "range"))
+fitMeanRP
+```
+
+## plot slopes
+
+```{r}
+fig.mCI.bar.pr <- ggplot(mslope_pr, aes(x = Exp, y = m_CI, ymin = m_CI- se_CI, ymax = m_CI + se_CI, group = interaction(priortype, range), color = priortype, shape = range)) + 
+  geom_point( position = position_dodge(width = 0.15))+
+  geom_line(position = position_dodge(width = 0.15))+
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.15)) +
+  labs(x = 'Experiment', y = 'Centrality index', shape= 'Interval Group', color='Prior Type') +
+  theme(legend.position = 'bottom', legend.title = element_blank())+
+  theme_new+
+  scale_color_manual(values = mycolors)
+ggsave(file.path('figures','fig.mCI.bar.pr.png'), fig.mCI.bar.pr, width = 5, height = 4)
+fig.mCI.bar.pr
+```
+```{r}
+fig.mCI.bar <- ggplot(mslope_pr, aes(x = range, y = m_CI, group = priortype, fill = priortype)) + 
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_errorbar(width=.2, aes(ymin = m_CI- se_CI, ymax = m_CI + se_CI), width=.2,position=position_dodge(.9)) +
+  labs(x = 'Range', y = 'Centrality index', fill= 'condition') +
+  theme(legend.position = 'top', legend.title = element_blank())+
+  theme_new+
+  facet_wrap(~Exp)+
+  scale_fill_manual(values = mycolors)+
+  ylim(0, 0.8)
+
+ggsave(file.path('figures','fig.mCI.bar.png'), fig.mCI.bar, width = 6, height = 4, dpi = 300)
+
+fig.mCI.bar
+```
+
+```{r}
+fig.mCI.bar.exp1 <- ggplot(mslope_pr %>% filter(Exp =='Exp1'), aes(x = range, y = m_CI, group = priortype, fill = priortype)) + 
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_errorbar(width=.2, aes(ymin = m_CI- se_CI, ymax = m_CI + se_CI), width=.2,position=position_dodge(.9)) +
+  labs(x = ' ', y = 'Centrality index in Exp1', fill= 'condition') +
+  theme(legend.position = 'bottom', legend.title = element_blank())+
+  theme_new+
+  scale_fill_manual(values = mycolors)+
+  ylim(0, 0.8)
+
+fig.mCI.bar.exp1
+```
+
+```{r}
+fig.mCI.bar.exp2 <- ggplot(mslope_pr %>% filter(Exp =='Exp2'), aes(x = range, y = m_CI, group = priortype, fill = priortype)) + 
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_errorbar(width=.2, aes(ymin = m_CI- se_CI, ymax = m_CI + se_CI), width=.2,position=position_dodge(.9)) +
+  labs(x = ' ', y = 'Centrality index in Exp.2', fill= 'condition') +
+  theme(legend.position = 'bottom', legend.title = element_blank())+
+  theme_new+
+  scale_fill_manual(values = mycolors)+
+  ylim(0, 0.8)
+
+fig.mCI.bar.exp2
+```
+
+
+## Combine subfigures for observed RP and slope
+
+```{r}
+fig_Observed_RP_pr <- ggpubr::ggarrange(fig_mRep_exp_scatter_exp1, fig_mRep_exp_scatter_exp2, fig.mCI.bar.pr, common.legend = TRUE, legend = 'bottom', labels = c('a', 'b', 'c'), ncol =3, widths = c(3,3,3))
+fig_Observed_RP_pr
+
+ggsave(file.path('figures','fig_Observed_RP_pr.png'), fig_Observed_RP_pr, width = 6, height = 3, dpi = 300)
+```
+
+## Estimated InP with bootstrapped 95% confidence intervals
+
+
+```{r}
+#calculate the bootstrapped 95% confidence intervals 
+generateCI = FALSE # tag for generation CI
+if(generateCI){
+  cilist <- NULL
+  my_data <- exps%>% select(NSub, Exp, priortype, range, RP, targetDur)
+  for(expname in unique(exps$Exp)){
+    for(prior in unique(exps$priortype)){
+      for(group in unique(exps$range)){
+        for(nsub in unique(exps$NSub)){
+          dat = my_data %>% filter(Exp == expname, priortype == prior, range == group, NSub == nsub)
+          set.seed(100) 
+          # Calling the boot function with the dataset 
+          # our function and no. of rounds 
+          num = 1000;
+          bs_InP <- boot(dat, getInP, R = num) 
+          bs_Slope <- boot(dat, getBootSlope,  R = num )
+          bs_Intercept <- boot(dat, getIntercept, R = num)
+          ci = data.frame(
+            Exp = expname,
+            priortype = prior,
+            range = group,
+            NSub = nsub,
+            sdInP = sd(bs_InP$t),
+            mInP = median(bs_InP$t),
+            mSlope = median(bs_Slope$t),
+            sdSlope = sd(bs_Slope$t),
+            mIntercept = median(bs_Intercept$t),
+            sdIntercept = sd(bs_Intercept$t)
+          )
+          cilist = data.frame(rbind(cilist, ci))
+        }
+      }
+    }
+  }
+  write.csv(cilist, file = paste0("generated/ci_list_median_1000.csv"))
+}
+```
+
+
+```{r}
+cilist = read.csv(paste0("generated/ci_list_median_1000.csv"))
+levels(cilist$priortype)[levels(cilist$priortype)=='mixed'] <- 'IR'
+levels(cilist$priortype)[levels(cilist$priortype)=='separated'] <- 'BR'
+
+# mark the mean of indifferent point outliers
+cilist$inPOutlier = FALSE
+cilist[which(cilist$Exp == 'Exp1' & (cilist$mInP > 2.4 |cilist$mInP < 0.4)),"inPOutlier"] = TRUE
+cilist[which(cilist$Exp == 'Exp2' & (cilist$mInP > 1.95 |cilist$mInP < 0.491)),"inPOutlier"] = TRUE
+#check if the outlier is the same as the outliers in variable slope_pr 
+cilist%>% filter(inPOutlier == TRUE)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(Rmisc)
+cilist$range <-cilist$group_sl
+mCI <- cilist%>% group_by(Exp, priortype, range) %>%
+  dplyr::summarise(n = n(),
+                   ci_InP_upper =CI(mInP,ci=0.95)["upper"],
+                   ci_InP_mean = CI(mInP,ci=0.95)["mean"],
+                   ci_InP_lower = CI(mInP,ci=0.95)["lower"],
+                   m_InP = mean(mInP),
+                   sd_InP = sd(mInP),
+                   se_InP = sd(mInP)/sqrt(n-1),
+                   ci_Slope_upper =CI(mSlope,ci=0.95)["upper"],
+                   ci_Slope_mean = CI(mSlope,ci=0.95)["mean"],
+                   ci_Slope_lower = CI(mSlope,ci=0.95)["lower"],
+                   m_Slope = mean(mSlope),
+                   sd_Slope = sd(mSlope),
+                   se_Slope = sd(mSlope)/sqrt(n-1),
+                   ci_Intercept_upper =CI(mIntercept,ci=0.95)["upper"],
+                   ci_Intercept_mean = CI(mIntercept,ci=0.95)["mean"],
+                   ci_Intercept_lower = CI(mIntercept,ci=0.95)["lower"],
+                   m_Intercept = mean(mIntercept),
+                   sd_Intercept = sd(mIntercept),
+                   se_Intercept = sd(mIntercept)/sqrt(n-1))
+#mslope_pr <- left_join(mCI, mslope_pr, by = c("Exp", "priortype", "range"))
+```
+
+```{r}
+fitMeanRP <- sumexp %>% group_by(Exp, priortype, range) %>%
+  dplyr::summarise(minDur = min(targetDur),
+                   maxDur= max(targetDur))
+
+mCI <- left_join(mCI, fitMeanRP, by = c("Exp", "priortype", "range"))
+mCI
+```
+
+
+## plot indifference points
+
+```{r}
+# columns in mslope_pr
+#inP means the mean InP across of all subjects' RP without removing outliers 
+#CI_mean means the mean of each subjects mean of InP distribution, where CI = 95%
+#m_InP means the mean of each subjects mean of InP distribution
+#mCI$range <- factor(mCI$range, levels = c("short", "long"))
+#mCI$priortype <- factor(mCI$priortype, levels = c("BR", "IR"))
+fig_mInP_pr_bar <- ggplot(data = mCI, aes(priortype, m_InP, fill = range))+
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_errorbar(aes(ymin=m_InP-se_InP, ymax=m_InP+se_InP), colour="black", width=.2, position=position_dodge(.9)) + 
+  facet_wrap(~Exp)+
+  scale_fill_manual(values = mycolors) +
+  theme_new+ theme(legend.position='bottom')+
+  labs(x = 'conditions', y = 'Mean indifference points (s)', size =5,  fill = 'range')+
+  ylim(0,2.2)
+
+ggsave(file.path('figures','fig_mInP_pr_bar.png'), fig_mInP_pr_bar, width = 7, height = 4, dpi= 300)
+fig_mInP_pr_bar
+```
+
+
+```{r}
+temp_mCI = mCI%>% select(Exp, priortype, range, m_InP, se_InP)
+temp_Exp_dist = Exp_dist %>%filter(group %in% c('short', 'long'))
+temp_Exp_dist$range = temp_Exp_dist$group
+temp_Exp_dist$group = NULL
+temp_Exp_dist$n = NULL
+temp_mCI = left_join(temp_mCI, temp_Exp_dist,  by =c("Exp", "range"))
+```
+
+```{r}
+# linear scale
+fig_mdur_mIP_log <- ggplot(data = temp_mCI, aes(gm_Dur, m_InP, color = priortype, shape= Exp))+
+  geom_point(size = 2)+
+  geom_line(data = temp_mCI %>%filter(priortype == 'IR'), aes(group = Exp, linetype = Exp)) +
+  geom_errorbar(aes(ymin=m_InP-se_InP, ymax=m_InP+se_InP, color = priortype)) + 
+  geom_hline(yintercept=0.9797959, linetype = 1) +  #Geometric mean 0.9797959
+  geom_point(x = 1.17, y = 1.06, shape = 1, size = 2, fill = 'white')+
+  geom_point(x = 1.11, y = 1.00, shape = 2, size =2, fill = 'white')+
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line+
+  scale_color_manual(values = mycolors) + theme_new +
+  labs(x = 'range mean duration', y = 'Indifference point (s)', size =5)+ #guides(color = "none", shape = "none")+ 
+   theme(legend.position='top')
+
+fig_mdur_mIP_log
+```
+
+```{r}
+# linear scale
+fig_mdur_mIP <- ggplot(data = temp_mCI, aes(mDur, m_InP, color = priortype, shape= Exp))+
+  geom_point(size = 2)+
+  geom_line(data = temp_mCI %>%filter(priortype == 'IR'), aes(group = Exp, linetype = Exp)) +
+  geom_errorbar(aes(ymin=m_InP-se_InP, ymax=m_InP+se_InP, color = priortype)) + 
+  geom_hline(yintercept=0.9797959, linetype = 1) +  #Geometric mean 0.9797959
+  geom_point(x = 1.17, y = 1.06, shape = 1, size = 2, fill = 'white')+
+  geom_point(x = 1.11, y = 1.00, shape = 2, size =2, fill = 'white')+
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line+
+  scale_color_manual(values = mycolors) + theme_new +
+  labs(x = 'range mean duration', y = 'Indifference point (s)', size =5)+ guides(color = "none", shape = "none")+ 
+   theme(legend.position='top')
+
+fig_mdur_mIP
+```
+
+#### mean indifference poinst based on group
+
+```{r}
+#based on group
+cilist = data.frame(cilist, stringsAsFactors=FALSE)
+cilist$group = cilist$range
+levels(cilist$group) <- c('long', 'short', 'mixed')
+cilist[which(cilist$priortype == "IR"), "group"] = 'mixed'
+ 
+mCI_gr <- cilist%>% group_by(Exp, group) %>%
+  dplyr::summarise(n = n(),
+                   ci_InP_upper =CI(mInP,ci=0.95)["upper"],
+                   ci_InP_mean = CI(mInP,ci=0.95)["mean"],
+                   ci_InP_lower = CI(mInP,ci=0.95)["lower"],
+                   m_InP = mean(mInP),
+                   sd_InP = sd(mInP),
+                   se_InP = sd(mInP)/sqrt(n-1),
+                   ci_Slope_upper =CI(mSlope,ci=0.95)["upper"],
+                   ci_Slope_mean = CI(mSlope,ci=0.95)["mean"],
+                   ci_Slope_lower = CI(mSlope,ci=0.95)["lower"],
+                   m_Slope = mean(mSlope),
+                   sd_Slope = sd(mSlope),
+                   se_Slope = sd(mSlope)/sqrt(n-1),
+                   ci_Intercept_upper =CI(mIntercept,ci=0.95)["upper"],
+                   ci_Intercept_mean = CI(mIntercept,ci=0.95)["mean"],
+                   ci_Intercept_lower = CI(mIntercept,ci=0.95)["lower"],
+                   m_Intercept = mean(mIntercept),
+                   sd_Intercept = sd(mIntercept),
+                   se_Intercept = sd(mIntercept)/sqrt(n-1))
+```
+
+
+```{r}
+#mCI_gr$group = factor(mCI_gr$group, levels = c("short", "long", "mixed"))
+fig_mInP_gr_bar <- ggplot(data = mCI_gr, aes(group, m_InP, fill = group))+
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_errorbar(aes(ymin=m_InP-se_InP, ymax=m_InP+se_InP), colour="black", width=.2, position=position_dodge(.9)) + 
+  facet_wrap(~Exp)+
+  scale_fill_manual(values = mycolors3) +
+  theme_new + theme(legend.position='none') +
+  labs(x = 'Session', y = 'Mean indifference point (s)', size =5,  fill = 'range') + ylim(0,2.2)
+
+fig_mInP_gr_bar
+```
+
+```{r}
+temp_mCI_gr = mCI_gr%>% select(Exp, group, m_InP, se_InP)
+
+temp_mCI_gr = left_join(temp_mCI_gr, Exp_dist,  by =c("Exp", "group"))
+```
+
+```{r}
+fig_mdur_mIP_gr <- ggplot(data = temp_mCI_gr, aes(mDur, m_InP, color = group, shape= Exp))+
+  geom_point(size = 2)+
+  geom_line(aes(group = Exp)) +
+  geom_errorbar(aes(ymin=m_InP-se_InP, ymax=m_InP+se_InP, color = group)) + 
+  geom_hline(yintercept=0.9798, linetype = 1) + 
+  geom_text(x=0.75, y=1.21, label="GM = 0.9798", show.legend = FALSE)+
+  #geom_hline(yintercept=1.11 , linetype = 1) + 
+  #geom_text(x=0.75, y=1.07, label="Grand mean = 1.11 in Exp.2", show.legend = FALSE)+
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line+
+  scale_color_manual(values = mycolors3) +
+  theme_new +
+  labs(x = 'range mean duration', y = 'Indifference point (s)', size =5)+
+  ylim(0.5,2)+xlim(0.5,2)
+
+fig_mdur_mIP_gr
+```
+
+
+
+## Combine mean sampele intervals with Mean indifference points
+
+```{r}
+fig_Dur_InP <- ggpubr::ggarrange(fig_stimuli_bar, fig_mInP_gr_bar,  common.legend = TRUE, legend = 'none', labels = c('a', 'b'), ncol =2, widths = c(3,3))
+fig_Dur_InP
+
+ggsave(file.path('figures','fig_Dur_InP.png'), fig_Dur_InP, width = 6, height = 3, dpi = 300)
+```
+
+```{r}
+fig_Dur_InP2 <- ggpubr::ggarrange(fig_stimuli_bar, fig_mInP_pr_bar,  common.legend = TRUE, legend = 'bottom', labels = c('a', 'b'), ncol =2, widths = c(3,5))
+fig_Dur_InP
+
+ggsave(file.path('figures','fig_Dur_InP2.png'), fig_Dur_InP2, width = 6, height = 3, dpi = 300)
+fig_Dur_InP2
+```
+
+
+
+
+```{r}
+mCI$y = 0.02
+mCI[which(mCI$priortype == 'BR'),"y"] = 0.2
+mCI$targetDur = mCI$y
+mCI$m_m_RP = mCI$y
+mCI$IntersectionX = mCI$ci_Intercept_mean/(1-mCI$ci_Slope_mean)
+mCI[which(mCI$IntersectionX > mCI$maxDur),"maxDur"] = mCI[which(mCI$IntersectionX > mCI$maxDur),"IntersectionX"]
+mCI[which(mCI$IntersectionX < mCI$minDur),"minDur"] = mCI[which(mCI$IntersectionX < mCI$minDur),"IntersectionX"]
+```
+
+
+
+```{r}
+##plot indifference points
+fig_InP_Ci_Intersection = ggplot(sumexp,
+                                 aes(targetDur, m_m_RP, group = interaction(priortype, range), color=priortype, shape =range))  +
+  geom_point(size =1.8) + 
+  geom_errorbar(aes(ymin = m_m_RP-m_se_err, ymax = m_m_RP + m_se_err), width = 0.05) +  ##error bars
+  geom_segment(data =mCI, aes(x = minDur, y = minDur*m_Slope+m_Intercept, xend = maxDur, yend = maxDur*m_Slope+m_Intercept), arrow = arrow(length = unit(0.1, 'cm')))+  ##dotted lines
+  geom_segment(data =temp_xy, aes(x=x, y = x*slope+minRP, xend = inP, yend = inP), arrow = NULL)+  ##dotted lines
+  geom_errorbarh(data = mCI, aes(xmin = ci_InP_lower, xmax = ci_InP_upper), height = .1)+ 
+  geom_point(data =mCI, aes(x = IntersectionX, y = y, color=priortype, fill = as.factor(priortype)), shape=21) + ## Intersection 
+    #geom_point(data =mCI, aes(x = ci_InP_mean, y = y, color=priortype), shape=21, fill = "black") + ## mean of estimated InP
+  #geom_segment(data =mCI, aes(x=ci_InP_mean, y = y+0.015, xend = ci_InP_mean, yend = ci_InP_mean), arrow = NULL)+ ##vertical lines with mean of estimaed InP
+  geom_segment(data =mCI, aes(x=IntersectionX, y = y+0.015, xend = IntersectionX, yend = IntersectionX), arrow = NULL)+ ##vertical lines for Intersection
+  #geom_text(data = mslope_pr, aes(x= ci_InP_mean, y=-0.1, label=round(ci_InP_mean, 2), group = interaction(priortype, range), color=priortype ))+  ##display the ci_InP_mean values 
+  geom_abline(slope = 1, linetype = 2) +
+  theme_new+ theme(legend.position='top')+ 
+  scale_color_manual(values = mycolors) +
+  scale_fill_manual(values = c('white', 'black')) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Durations (s)', y = 'Mean Reproductions (s)', size =5, shape= 'Range', color='Condition')+ guides(fill = FALSE)+
+  facet_wrap(~Exp)
+
+ggsave(file.path('figures','fig_InP_Ci_Intersection97.5.png'), fig_InP_Ci_Intersection, width = 7, height = 4, dpi= 300)
+fig_InP_Ci_Intersection
+```
+
+
+
+
+```{r}
+#define the extension
+mCI$extension1_start = mCI$maxDur
+mCI$extension1_end = mCI$maxDur
+mCI$extension2_start = mCI$minDur
+mCI$extension2_end = mCI$minDur
+mCI[which(mCI$range  == "short" & mCI$priortype == "IR"),"extension1_end"] = 1.15
+mCI[which(mCI$range  == "long"& mCI$priortype == "IR"),"extension2_start"] = 0.8
+```
+
+```{r}
+exp.labs = c("Exp.1", "Exp.2") 
+names(exp.labs) <- c("Exp1", "Exp2")
+
+##plot indifference points with extension
+fig_InP_Ci_Intersection1 = ggplot(sumexp,
+                                 aes(targetDur, m_m_RP, group = interaction(priortype, range), color=priortype, shape =range))  +
+  geom_point(size =1.8) + 
+  geom_errorbar(aes(ymin = m_m_RP-m_se_err, ymax = m_m_RP + m_se_err), width = 0.05) +  ##error bars
+  geom_segment(data =mCI, aes(x = minDur, y = minDur*m_Slope+m_Intercept, xend = maxDur, yend = maxDur*m_Slope+m_Intercept), arrow = arrow(length = unit(0.1, 'cm')))+  ##dotted lines
+  geom_segment(data =mCI, aes(x=extension1_start, y = extension1_start*m_Slope+m_Intercept, xend = extension1_end, yend= extension1_end*m_Slope+m_Intercept), arrow = NULL, linetype = 3)+  ##Extension
+  geom_segment(data =mCI, aes(x=extension2_start, y =extension2_start*m_Slope+m_Intercept, xend = extension2_end, yend= extension2_end*m_Slope+m_Intercept), arrow = NULL, linetype = 3)+  ##Extension
+  geom_errorbarh(data = mCI, aes(xmin = ci_InP_lower, xmax = ci_InP_upper), height = .1)+ 
+  geom_point(data =mCI, aes(x = IntersectionX, y = y, color=priortype, fill = as.factor(priortype)), shape=21) + ## Intersection 
+  geom_segment(data =mCI, aes(x=IntersectionX, y = y+0.015, xend = IntersectionX, yend = IntersectionX), arrow = NULL)+ ##vertical lines for Intersection
+  geom_abline(slope = 1, linetype = 2) +
+  theme_new+ theme(legend.position='bottom')+ 
+  scale_color_manual(values = mycolors) +
+  scale_fill_manual(values = c('white', 'black')) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Durations (s)', y = 'Mean Reproductions (s)', size =5, shape= 'group', color='prior type')+ guides(fill = FALSE)+ 
+  facet_grid(~Exp, labeller = labeller(Exp = exp.labs))+ guides(shape = FALSE)+scale_x_continuous(trans='log10')+scale_y_continuous(trans='log10')
+
+ggsave(file.path('figures','fig_InP_Ci_Intersection1.png'), fig_InP_Ci_Intersection1, width = 7, height = 4, dpi= 300)
+fig_InP_Ci_Intersection1 
+```
+
+
+
+# Export for JASP
+
+```{r}
+#export mean data for pingouin statistics analysis 
+write.csv(m_exp_sub, file = paste0("generated/m_exp_sub.csv"))
+write.csv(sumexpSub, file = paste0("generated/sumexpSub.csv"))
+write.csv(slope_pr, file = paste0("generated/slope_pr.csv"))
+write.csv(cilist, file = paste0("generated/cilist.csv"))
+```
+
+```{r}
+write_csv(dplyr::group_by(sumexp1Sub%>% filter(priortype =='IR'), targetDur, NSub) %>%
+  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_IR1.csv'))
+
+write_csv(dplyr::group_by(sumexp1Sub%>% filter(priortype =='BR'), targetDur, NSub) %>%
+  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_BR1.csv'))
+
+write_csv(dplyr::group_by(sumexp2Sub%>% filter(priortype =='IR'), targetDur, NSub) %>%
+  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_IR2.csv'))
+
+write_csv(dplyr::group_by(sumexp2Sub%>% filter(priortype =='BR'), targetDur, NSub) %>%
+  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_BR2.csv'))
+```
+
+List all of the parameters for exp1 and export data for JASP
+
+```{r}
+for(i in 1:2){
+  cv_dat <- m_exp_sub%>% filter(Exp == paste0('Exp',i))
+  cv_dat <- cv_dat[c("NSub","Exp","m_m_err","m_m_BIAS","m_CV","m_m_RP","range","priortype")]
+  cv_dat$prior_sl <- paste0(cv_dat$priortype, '_', cv_dat$range)
+  cv_dat$priortype <- NULL
+  cv_dat$range <- NULL
+  cv_jasp_exp <- cv_dat%>% 
+    unite(NBIAS.cv.RP, m_m_err, m_m_BIAS, m_CV, m_m_RP)%>%
+    spread(prior_sl, NBIAS.cv.RP)%>%
+    separate(`IR_long`, c("ml_err", "ml_NBIAS", "ml_cv","ml_RP"), sep = "_")%>%
+    separate(`IR_short`, c("ms_err", "ms_NBIAS", "ms_cv", "ms_RP"), sep = "_")%>%
+    separate(`BR_long`, c("sl_err", "sl_NBIAS", "sl_cv", "sl_RP"), sep = "_")%>%
+    separate(`BR_short`, c("ss_err", "ss_NBIAS", "ss_cv", "ss_RP"), sep = "_")
+  
+  write.csv(cv_jasp_exp, file = paste0("generated/cv_jasp_exp", i,".csv"))
+  
+  
+  dat <-slope_pr %>% filter(Exp == paste0('Exp',i))
+  dat$data <- NULL
+  dat$model <- NULL
+  dat$prior_sl <- paste0(dat$priortype, '_', dat$range)
+  dat$priortype <- NULL
+  dat$range <- NULL
+  dat$inPOutlier <- NULL
+  slope_jasp_exp <- dat%>% 
+    unite(minRP.slope.inP, minRP, slope, CI, inP)%>%
+    spread(prior_sl, minRP.slope.inP)%>%
+    separate(`IR_long`, c("ml_minRP", "ml_slope", "ml_ci","ml_inP"), sep = "_")%>%
+    separate(`IR_short`, c("ms_minRP", "ms_slope", "ms_ci", "ms_inP"), sep = "_")%>%
+    separate(`BR_long`, c("sl_minRP", "sl_slope", "sl_ci", "sl_inP"), sep = "_")%>%
+    separate(`BR_short`, c("ss_minRP", "ss_slope", "ss_ci", "ss_inP"), sep = "_")
+  
+  write.csv(slope_jasp_exp, file = paste0("generated/priorslope_jasp_exp", i,".csv"))
+}
+```
+
+
+# combining plots
+
+```{r}
+fig_RP_pr <- ggpubr::ggarrange(fig_mRep_exp_scatter_exp1, fig_mrepError_pr_exp1, fig_diff_RP_exp1_Normalized, fig_mRep_exp_scatter_exp2, fig_mrepError_pr_exp2, fig_diff_RP_exp2_Normalized, common.legend = TRUE, legend = 'top', labels = c('a', 'b', 'c','d', 'e', 'f' ), ncol =3, nrow =2, widths = c(4,4,4))
+
+ggsave(file.path('figures','fig_RP_pr.png'), fig_RP_pr, width = 8, height = 7)
+
+fig_RP_pr
+```
+
+```{r}
+#fig.mCI.bar.exp1  fig.mCI.bar.exp2
+fig_CI <- ggpubr::ggarrange(fig.mCI.bar.exp1, fig.mCI.bar.exp2, common.legend = TRUE, legend = 'bottom', labels = c('a', 'b'), ncol =2, nrow =1, widths = c(4,4))
+
+ggsave(file.path('figures','fig_CI.png'), fig_CI, width = 8, height = 4)
+
+fig_CI
+```
+
+```{r}
+fig_CI1 <- ggpubr::ggarrange(fig.mCI.bar, fig_stimuli_bar, common.legend = FALSE, legend = 'bottom', labels = c('a', 'b'), ncol =2, nrow =1, widths = c(5,4))
+
+ggsave(file.path('figures','fig_CI1.png'), fig_CI1, width = 8, height = 4)
+
+fig_CI1
+```
+
+```{r}
+# indifference points
+fig_IPs <- ggpubr::ggarrange(fig_InP_Ci_Intersection1, fig_mdur_mIP, common.legend = FALSE, legend = 'bottom', labels = c('a', 'b'), ncol =2, nrow =1, widths = c(6,3))
+
+ggsave(file.path('figures','fig_IPs.png'), fig_IPs, width = 8, height = 4)
+
+fig_IPs
+```
+

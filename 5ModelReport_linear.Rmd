@@ -1,0 +1,549 @@
+---
+title: "ModelReportAll"
+author: "Xiuna Zhu"
+date: "10/2/2022"
+output:
+  pdf_document: 
+    number_sections: true
+  html_document:
+    df_print: paged
+    number_sections: true
+---
+```{r setup,}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load the packages {-}
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(reshape2)
+library(latex2exp)
+library(rlist)
+library(bayesplot)
+library(ggpubr)
+source('ana_functions.R') 
+source('mytheme.R') 
+linearVerion = 'linear'
+rstanmodelPath = 'RSTANMODELS'
+modelPath = paste0(rstanmodelPath, '/models/', linearVerion)
+AllExpData <- read.csv(paste0("data/AllExpData_valid.csv"))
+```
+
+
+# Baseline model results (for BR condition)
+
+## load baseline model results
+
+
+```{r include=FALSE}
+#load the parameters from baseline model by fitting BR data 
+All_PredY_BR = read.csv(paste0(getwd(), "/RSTANMODELS/models/Baseline_linear/All_PredY_BR.csv")) 
+All_PredY_BR$model = 'Baseline'
+All_PredY_BR$X = NULL
+All_PredY_BR1 = All_PredY_BR
+All_PredY_BR1$wp = NULL
+All_PredY_BR_col= colnames(All_PredY_BR1)
+```
+
+```{r include=FALSE}
+#load the predicted RP by fitting BR data 
+All_NewY_BR = read_csv("RSTANMODELS/models/Baseline_linear/NewY_IP.csv")
+names(All_NewY_BR)[names(All_NewY_BR) == "exp"] <- "Exp"
+```
+
+
+```{r include=FALSE}
+m_parameter_BR = All_PredY_BR %>% dplyr::group_by(targetDur, Exp, group) %>%
+  dplyr::summarise(mRP = mean(RP),  n= n(), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP),  sd_mu_r = sd(mu_r), sd_sig_r = sd(sig_r), m_wp = mean(wp), sd_wp = sd(wp))
+
+m_parameter_BR_sub = All_PredY_BR %>% dplyr::group_by(NSub, Exp, group) %>%
+  dplyr::summarise(mRP = mean(RP),  n= n(), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP),  sd_mu_r = sd(mu_r), sd_sig_r = sd(sig_r), m_wp = mean(wp), sd_wp = sd(wp))
+
+mm_parameter_BR = All_PredY_BR %>% dplyr::group_by(Exp, group) %>%
+  dplyr::summarise(mRP = mean(RP),  n= n(), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP), sd_mu_r = sd(mu_r), sd_sig_r = sd(sig_r), m_wp = mean(wp), sd_wp = sd(wp))
+```
+
+## plot predicted reproduction based on baseline model
+
+```{r include=FALSE}
+fig_predRP_BR = ggplot(m_parameter_BR, aes(targetDur, m_mu_r, color = 'blue')) + 
+  geom_point() +
+  geom_point(aes(targetDur, mRP, color = 'red'))+
+  geom_point(data = All_NewY_BR %>% dplyr::group_by(curDur, Exp) %>%
+  dplyr::summarise(m_mu_r = mean(mu_r)), aes(curDur, m_mu_r, color = 'red'), size = 0.2)+
+  facet_wrap(~Exp)+
+  theme_new+ #scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'Predicted reproduction',  color='blue')+ 
+  scale_color_manual(labels = c("predicted", "observed"), values = c("blue", "red")) +
+  theme(legend.position='bottom')+
+  #scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_predRP_BR
+```
+```{r include=FALSE}
+fig_predRP_Error_BR = ggplot(m_parameter_BR, aes(targetDur, m_mu_r- mRP)) + 
+  geom_point() +
+  facet_wrap(~Exp)+
+  theme_new+ #scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'Predicted RP - observed RP', shape= 'range', color='condition')+ 
+  theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_predRP_Error_BR
+```
+## plot weight of local prior based on baseline model
+
+```{r  include=FALSE}
+fig_wp_BR = ggplot(mm_parameter_BR, aes(group, m_wp, color = group)) +
+  geom_point(position = position_dodge()) +
+  geom_errorbar(aes(ymin = m_wp-sd_wp, ymax = m_wp + sd_wp),position = position_dodge()) +
+  facet_wrap(~Exp)+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated weight of prior')+
+  theme(legend.position='bottom')
+
+fig_wp_BR
+```
+```{r}
+fig_wp_BR_subj = ggplot(m_parameter_BR_sub, aes(group, m_wp, color = group)) +
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  facet_wrap(~Exp)+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated weight of prior')+
+  theme(legend.position='bottom')
+
+fig_wp_BR_subj
+```
+## load the estimated parameters from linear baseline model on BR session
+
+```{r include=FALSE}
+AllDat_Bayparlist_BR <- read_csv("RSTANMODELS/models/Baseline_linear/AllDat_Bayparlist_BR.csv")
+```
+
+
+## plot estimated short prior from baseline model
+
+```{r}
+ggplot(AllDat_Bayparlist_BR, aes(Exp, mu_p_s)) + 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated mean of short prior')+ 
+  theme(legend.position='bottom')
+```
+
+```{r}
+ggplot(AllDat_Bayparlist_BR, aes(Exp, sig_pr2_s)) + 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated variance of short prior')+ 
+  theme(legend.position='bottom')
+```
+
+
+## plot estimated long prior from baseline model
+
+```{r}
+ggplot(AllDat_Bayparlist_BR, aes(Exp, mu_p_l)) + 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated mean of long prior')+ 
+  theme(legend.position='bottom')
+```
+```{r}
+ggplot(AllDat_Bayparlist_BR, aes(Exp, sig_pr2_l)) + 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated variance of long prior')+ 
+  theme(legend.position='bottom')
+```
+## plot estimated sig_t from baseline model
+
+```{r}
+ggplot(AllDat_Bayparlist_BR, aes(Exp, sig_t)) + 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated weber fraction in linear model')+ 
+  theme(legend.position='bottom')
+```
+## plot estimated variance of montor noise from baseline model
+
+```{r}
+ggplot(AllDat_Bayparlist_BR, aes(Exp, sig2_mn)) + 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = ' ', y = 'estimated variance of montor noise in log')+ 
+  theme(legend.position='bottom')
+```
+
+
+
+## load the estimated parameter of linear models on IR session
+
+```{r include=FALSE}
+AllDat_Bayparlist <- read_csv("RSTANMODELS/models/linear/rlt/AllDat_Bayparlist_linear.csv")
+m_Baypar <- dplyr::group_by(AllDat_Bayparlist, Nsub, Exp, model) %>%
+  dplyr::summarize(m_mu_p_g = mean(mu_p_g),
+                   m_sig2_p_g = mean(sig2_p_g),
+                   m_mu_p_s_IR = mean(mu_p_s_IR),
+                   m_mu_p_l_IR = mean(mu_p_l_IR),
+                   m_sig2_p_g = mean(sig_pr2_s_IR),
+                   m_sig_pr2_l_IR = mean(sig_pr2_l_IR)) 
+m_Baypar
+write.csv(m_Baypar, paste0(modelPath,"/rlt/m_Baypar_", linearVerion, ".csv") )
+```
+
+
+
+
+```{r}
+mm_Baypar <- dplyr::group_by(m_Baypar, Exp, model) %>%
+  dplyr::summarize( mm_mu_p_s = mean(m_mu_p_s_IR), 
+                    mm_mu_p_l = mean(m_mu_p_l_IR), 
+                    mm_mu_p_g = mean(m_mu_p_g), 
+                    mm_sig2_p_s = mean(m_mu_p_s_IR),
+                    mm_sig2_p_l = mean(m_sig_pr2_l_IR),
+                    mm_sig2_p_g = mean(m_sig2_p_g))
+mm_Baypar
+```
+
+
+
+```{r}
+fig_sigma2_long <- ggplot(mm_Baypar, aes(Exp, mm_sig2_p_l, ymin = mm_sig2_p_l -se_sig2_p_l , ymax = mm_sig2_p_l + se_sig2_p_l, group = model, color = model), shape = model)+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  theme_minimal()+ theme_new +
+  labs(x = " ",
+       y = "variance of local prior for long range",
+       color = "model")+
+  #scale_color_manual(values = mycolors5) +
+  scale_shape_manual(values = myshapevalues)
+```
+
+# Analysis on predicted RP of IR session
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+#load prediction generated by models
+All_predY <- read_csv("RSTANMODELS/models/linear/rlt/PredY_mix_list_linear.csv")  #IR data fitting results
+All_predY$model <- as.factor(All_predY$model)
+All_predY$RP_BIAS = All_predY$RP- All_predY$targetDur
+All_predY$prederr = All_predY$mu_r - All_predY$RP #prediction error
+All_predY$predBIAS = All_predY$mu_r- All_predY$targetDur
+All_predY$predNBIAS = abs(All_predY$mu_r- All_predY$targetDur)
+All_predY$priortype = 'IR'
+All_predY$range = 'short'
+All_predY[which(All_predY$targetDur>1),"range"] = 'long'
+All_predY$range = as.factor(All_predY$range)
+```
+
+
+```{r}
+# m_predY <- dplyr::group_by(All_predY, Exp, targetDur, model) %>%
+#   dplyr::summarize( n = n(), 
+#                     m_RP = mean(RP), #mean of observed RP
+#                     sd_RP = sd(RP), #observed sd of RP
+#                     m_sig_r = mean(sig_r),
+#                     m_mu_r = mean(mu_r),
+#                     sd_mu_r = sd(mu_r))   
+# 
+# m_predY$merr_mu_r <- (m_predY$m_mu_r - m_predY$m_RP)/m_predY$m_RP
+# m_predY$merr_sig_r <- (m_predY$m_sig_r - m_predY$sd_RP)/m_predY$sd_RP
+# m_predY
+```
+
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+predY <- group_by(All_predY, targetDur, Exp, NSub, model, priortype,range) %>%
+  dplyr::summarize(m_RP = mean(RP),
+                   m_RP_BIAS = mean(RP_BIAS),
+                   m_predBIAS = mean(predBIAS),
+                   m_predNBIAS = mean(predNBIAS),
+                   m_prederr = mean(prederr),
+                   n = n(),
+                   sd_RP = sd(RP),
+                   cv_observed = sd_RP/m_RP,
+                   se_RP = sd_RP/ sqrt(n-1),
+                   m_mu_r = mean(mu_r),
+                   m_sig_r = mean(sig_r), # sd of prediction
+                   cv_Pred = m_sig_r/m_mu_r)
+
+gp_var <- c('targetDur', 'Exp', 'model', 'range')
+m_predY <- summarizePredY(predY, gp_var)
+
+
+gp_var_sub <- c('NSub', 'Exp', 'model', 'range')
+m_predY_sub <- summarizePredY(predY, gp_var_sub)
+```
+
+## Observed and predicted Reproduction Error 
+
+```{r message=FALSE, warning=FALSE}
+exps <- read.csv(paste0(getwd(), '/data/AllExpData_valid.csv'))
+gp_var_prior= c("NSub", "targetDur", "Exp", "priortype", "range")
+sumexp <- summarizeMeanData(exps, gp_var_prior)
+sumexp$model = as.factor('measured')
+
+m_predY$range = 'short'
+m_predY[which(m_predY$targetDur > 1),"range"] = 'long'
+m_predY$range = as.factor(m_predY$range)
+
+
+fig_mrepError_model <- ggplot(m_predY,
+                              aes(targetDur, 
+                                  mm_mu_r-m_m_RP, 
+                                  ymin = m_m_prederr - se_prederr, 
+                                  ymax = m_m_prederr + se_prederr,
+                                  group = interaction(range, model), color = model)) + 
+  geom_point(position = position_dodge(width = 0.05))+
+  geom_errorbar(width = .05, position = position_dodge(width = 0.05))+
+  geom_line(size = .5, aes(color = model, linetype = model),  position = position_dodge(width = 0.05))+
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_minimal()+ theme_new + 
+  #scale_color_manual(values = mycolors5) +
+  scale_linetype_manual(values =  c('solid','dotted','dashed' ))+
+  facet_wrap(~Exp)+
+  scale_linetype(guide = FALSE)+
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals (s)', y = 'Reproduction Error (s)',  color='model')+ theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') +colorSet4
+
+
+ggsave(file.path(modelPath,'figures/fig_mrepError_model.png'), fig_mrepError_model, width = 7, height = 4)
+fig_mrepError_model
+```
+
+
+
+```{r}
+predY_err_new <- m_predY_sub %>%dplyr::group_by(Exp, model) %>%
+  dplyr::summarize(n= n(),
+                   mm_m_RP = mean(m_m_RP),
+                   mm_sd_RP = mean(m_sd_RP),
+                   mm_pred_Var = mean(mm_sig_r- m_sd_RP),
+                   mm_pred_Var_NBIAS = mean(abs(mm_sig_r- m_sd_RP)),
+                   se_prederr = sd(m_m_prederr)/sqrt(n-1),
+                   se_pred_Var = sd(mm_sig_r- m_sd_RP)/sqrt(n-1), 
+                   m_m_prederr = mean(m_m_prederr),
+                   m_m_pred_NBIAS = mean(abs(m_m_prederr)))
+```
+
+
+```{r}
+gp_var_sub <- c('NSub', 'Exp', 'model')
+m_predY_sub_new <- summarizePredY(predY, gp_var_sub)
+m_predY_sub_new$mm_pred_Var = m_predY_sub_new$mm_sig_r- m_predY_sub_new$m_sd_RP
+plt_rErrorScatter1 = ggplot(data = predY_err_new, aes(m_m_prederr, mm_pred_Var, color = model)) +  
+  geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point(alpha = .5, size = 4)+
+  geom_errorbar(aes(ymin = mm_pred_Var-se_pred_Var, ymax = mm_pred_Var+se_pred_Var), width = .005)+
+  geom_errorbarh(aes(xmin=m_m_prederr-se_prederr, xmax = m_m_prederr+se_prederr), width = .1)+
+  geom_point(m_predY_sub_new, mapping = aes(m_m_prederr, mm_pred_Var, color = model), alpha = .9) +  
+  facet_wrap(~Exp) +colorSet4+
+  xlab('Prediction error in the RP mean')+ 
+  ylab('Prediction error in the RP variance')+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+plt_rErrorScatter1
+```
+
+```{r}
+predY_err_new$acc_err <- 100*(1-predY_err_new$m_m_pred_NBIAS/predY_err_new$mm_m_RP)
+predY_err_new$acc_var <- 100*(1-predY_err_new$mm_pred_Var_NBIAS/predY_err_new$mm_sd_RP)
+```
+
+
+```{r}
+plt_rErrorScatter2 = ggplot(data = predY_err_new, aes(m_m_pred_NBIAS, mm_pred_Var_NBIAS, color = model)) +  
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point(alpha = .5, size = 4)+
+  geom_errorbar(aes(ymin = mm_pred_Var_NBIAS-se_prederr, ymax = mm_pred_Var_NBIAS+se_prederr), width = .005)+
+  geom_errorbarh(aes(xmin= m_m_pred_NBIAS-se_pred_Var, xmax = m_m_pred_NBIAS+se_pred_Var), height = .01)+
+  geom_point(m_predY_sub_new, mapping = aes(abs(m_m_prederr), abs(mm_pred_Var), color = model), alpha = .9) +  
+  facet_wrap(~Exp) +colorSet4+
+  xlab('Mean absolute error of reproduction mean')+  
+  ylab('Mean absolute error of reproduction variance')+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+plt_rErrorScatter2
+```
+
+
+
+```{r}
+plt_rErrorScatter3 = ggplot(data = predY_err_new, aes(100*m_m_pred_NBIAS/mm_m_RP, 100*mm_pred_Var_NBIAS/mm_sd_RP, color = model)) +  
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point(alpha = .5, size = 5)+
+  geom_errorbar(aes(ymin = 100*(mm_pred_Var_NBIAS-se_prederr)/mm_sd_RP, ymax = 100*(mm_pred_Var_NBIAS+se_prederr)/mm_sd_RP), width = .2)+
+  geom_errorbarh(aes(xmin= 100*(m_m_pred_NBIAS-se_pred_Var)/mm_m_RP, xmax = 100*(m_m_pred_NBIAS+se_pred_Var)/mm_m_RP), height = 2)+
+  geom_point(m_predY_sub_new, mapping = aes(100*abs(m_m_prederr)/m_m_RP, 100*abs(mm_pred_Var)/m_sd_RP, color = model), alpha = .5) +  
+  facet_wrap(~Exp) +colorSet4+
+  xlab('MAPE of Reproduction mean(%)')+ 
+  ylab('MAPE of Reproduction variance(%)')+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+plt_rErrorScatter3
+```
+
+```{r}
+fig_ModelRlt <- ggarrange(fig_mrepError_model, plt_rErrorScatter3, common.legend = TRUE, nrow = 2, ncol = 1, labels = c('a', 'b'))
+ggsave(paste0(getwd(), "/", modelPath, "/figures/fig_ModelRlt.png"), fig_ModelRlt, width = 7, height = 7)
+fig_ModelRlt
+```
+
+
+## Compute correlation
+
+```{r}
+cor_err_table <- predY %>% dplyr::group_by(Exp, model) %>%
+  dplyr::summarise(r2 = cor(m_RP, m_mu_r, method = c("pearson", "kendall", "spearman")))%>% dplyr::group_by(Exp, model) %>%
+  dplyr::summarise(m_r2 = mean(r2))
+cor_err_table
+```
+
+```{r}
+cor_err_table <- predY%>% dplyr::group_by(Exp, model) %>%
+  dplyr::summarise(r2 = cor(m_RP, m_mu_r, method = c("pearson", "kendall", "spearman")))%>% dplyr::group_by(Exp, model) %>%
+  dplyr::summarise(m_r2 = mean(r2))
+cor_err_table
+```
+
+
+#  Model comparision in prediction 
+
+```{r include=FALSE}
+m_predY_sub <- All_predY%>%
+  dplyr::group_by( targetDur, model, Exp, NSub) %>%
+  dplyr::summarize(m_repDur = mean(RP), 
+                   n = n(), 
+                   sd_repDur = sd(RP),
+                   m_mu_r = mean(mu_r), 
+                   m_sig_r = mean(sig_r),
+                   predRP_err = mean(mu_r-RP),
+                   predVar_err = mean(sig_r-sd_repDur),
+                   predRP_rerr = mean(abs(mu_r-m_repDur)/m_repDur),
+                   predVar_rerr = mean(abs(sig_r-sd_repDur)/sd_repDur),
+                   cv = sd_repDur/m_repDur,
+                   pred_cv = mean(sig_r/mu_r),
+                   predcv_err = pred_cv-cv,
+                   predcv_rerr = mean(abs(pred_cv-cv)/cv) )
+
+
+m_predErr_sub<- m_predY_sub%>%
+  dplyr::group_by(Exp, model, NSub) %>% dplyr::summarise(
+    mpredRP_err=mean(predRP_err),
+    mpredVar_err=mean(predVar_err),
+    mpredRP_rerr = mean(predRP_rerr),
+    mpredVar_rerr = mean(predVar_rerr),
+    mpredcv_rerr = mean(predcv_rerr),
+    mpredcv_err = mean(predcv_err))
+
+m_predY <- m_predY_sub %>%
+  dplyr::group_by(Exp, targetDur, model) %>% 
+  dplyr::summarize(n = n(),
+                   m_m_repDur = mean(m_repDur),
+                   se_m_repDur = sd(m_repDur) /sqrt(n-1),
+                   m_sd_repDur = mean(sd_repDur), 
+                   m_m_sig_r =mean(m_sig_r),
+                   se_sig_r = sd(m_sig_r)/sqrt(n-1),
+                   m_m_mu_r = mean(m_mu_r),
+                   cv = mean(cv),
+                   pred_cv = mean(pred_cv),
+                   mpredRP_err = mean(predRP_err),
+                   mpredVar_err = mean(predVar_err),
+                   mpredRP_rerr = mean(predRP_rerr),
+                   mpredVar_rerr = mean(predVar_rerr), 
+                   mpredcv_err = mean(predcv_err),
+                   mpredcv_rerr = mean(predcv_rerr))
+
+m_predErr<- m_predY%>% 
+  dplyr::group_by(Exp, model) %>% dplyr::summarise(
+    mmpredRP_err=mean(mpredRP_err),
+    mmpredVar_err=mean(mpredVar_err),
+    mmpredRP_rerr = mean(mpredRP_rerr),
+    mmpredVar_rerr = mean(mpredVar_rerr),
+    mmpredcv_rerr = mean(mpredcv_rerr),
+    mmpredcv_err = mean(mpredcv_err))
+m_predErr_sub$version = 'linear'
+m_predErr$version = 'linear'
+write.csv(m_predErr_sub, paste0(getwd(), "/", modelPath, "/rlt/m_predErr_sub_", linearVerion, ".csv"))
+write.csv(m_predErr, paste0(getwd(), "/", modelPath, "/rlt/m_predErr_", linearVerion, ".csv"))
+```
+
+
+### plot prediction error of RP mean vs. CV 
+```{r}
+ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredcv_rerr*100, color = model, alpha = .9)) + 
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredcv_rerr*100, color = model, alpha = .9, size = 1 ))+
+  xlab('Relative prediction error in the RP means (%)')+ ylab('Relative prediction error of CV (%)')+colorSet4+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+```
+
+
+
+```{r}
+plt_rErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredVar_rerr*100, color = model, alpha = .9)) + 
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredVar_rerr*100, color = model, alpha = .9, size = 1 ))+
+  xlab('Relative prediction error in the RP means (%)')+ ylab('Relative prediction error in the RP variance (%)')+colorSet4+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+plt_rErrorScatter
+```
+
+
+```{r}
+plt_ErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_err, mpredVar_err, color = model, alpha = .9)) + 
+  geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_err, mmpredVar_err, color = model, alpha = .9, size = 1 ))+
+  xlab('Prediction error in the RP means (ms)')+ ylab('Prediction error in the RP variance (ms)')+colorSet4+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+plt_ErrorScatter
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  

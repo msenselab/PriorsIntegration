@@ -1,0 +1,7 @@
+"0","#generate the path of the results based on model version"
+"0","log_2part_Version = 'log_2part'"
+"0","modelPath = paste0(rstanmodelPath, '/models/', log_2part_Version)"
+"0",""
+"0","#load result of Bayesian parameters of all models "
+"0","AllDat_Bayparlist_2part <- read.csv(paste0(modelPath,""/rlt/AllDat_Bayparlist_"", log_2part_Version, "".csv""))"
+"0","AllDat_Bayparlist_2part$model <- as.factor(AllDat_Bayparlist_2part$model)"

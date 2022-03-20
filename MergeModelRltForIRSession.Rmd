@@ -1,0 +1,209 @@
+---
+title: "MergeModeRltForIR"
+author: "Fiona Zhu"
+date: "2/16/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load library
+
+```{r}
+library(tidyverse)
+library(reshape2)
+library(rlist)
+```
+
+
+# Merge the Result data{-}
+
+To preprocess the model result data, and merge different model version data together.
+
+```{r include=FALSE}
+modellist <- c('LGM','DIM','PIM', 'IP')# #'BPM' #'Baseline' 
+colnames_predY <-  c("id", "trialnum", "NSub", "targetDur","RP",  "Exp", "group", "model", "mu_r", "sig_r", "predY","log_lik",  "W_P_G", "W_L", "W_Ds", "part")
+colnames_newY <-  c("NSub", "curDur", "exp", "group", "model", "mu_r", "sig_r", "log_lik", "W_P_G" , "W_L", "W_Ds", "part")
+```
+
+
+```{r}
+# #load the parameters by fitting BR data
+# All_PredY_BR= read.csv(paste0(getwd(), "/RSTANMODELS/models/Baseline_linear/All_PredY_BR.csv")) 
+# All_PredY_BR$model = 'Baseline'
+# All_PredY_BR$X = NULL
+# All_PredY_BR$wp = NULL
+```
+
+
+## Merge the Result data (fit all IR data)
+```{r}
+mergeAllModelRlt <- function(modellist, modelver){
+  curModelPath = paste0('RSTANMODELS/models/', modelver)
+  AllDat_Bayparlist <- {}
+  PredY_mix_list <- {}
+  modelResultAll <- list()
+  NewY_mix_list <- list()
+  rltfilename <- c(paste0("rlt_", modellist, ".rds"))
+  if(modelver %in% c('log_2part', 'linear_2part')){
+    rltfilename <- c(paste0("rlt_", modellist, "_2part.rds"))
+  }
+  
+  for (j in 1:length(rltfilename)){
+    PredY_mix_list_model <- {}
+    new.data = readRDS(paste0(getwd(), "/", curModelPath, "/rlt/", rltfilename[j]))
+    for (i in 1:length(new.data)){
+      modelResultAll <- list.append(modelResultAll, new.data[[i]])
+      AllDat_Bayparlist <- rbind(AllDat_Bayparlist, new.data[[i]]$Baypar)
+      PredY_mix_list <- rbind(PredY_mix_list, new.data[[i]]$PredY_mix_list%>% select(colnames_predY))
+      PredY_mix_list_model <- rbind(PredY_mix_list_model, new.data[[i]]$PredY_mix_list)
+      NewY_mix_list <- rbind(NewY_mix_list, new.data[[i]]$NewY_mix_list%>% select(colnames_newY))
+    }
+    write.csv(PredY_mix_list_model, paste0(getwd(), "/", curModelPath, "/rlt/PredY_", modellist[j], ".csv"))
+  }
+  
+  write.csv(AllDat_Bayparlist, paste0(getwd(), "/", curModelPath, "/rlt/AllDat_Bayparlist_", modelver, ".csv"))
+  write.csv(PredY_mix_list, paste0(getwd(), "/", curModelPath, "/rlt/PredY_mix_list_", modelver, ".csv"))
+  write.csv(NewY_mix_list, paste0(getwd(), "/", curModelPath, "/rlt/NewY_mix_list_", modelver, ".csv"))
+  
+  # Mix_list_predY <- PredY_mix_list %>% select(All_PredY_BR_col)
+  # All_predY <- rbind(All_PredY_BR1, Mix_list_predY)
+  # write.csv(All_predY, paste0(getwd(), "/", curModelPath, "/rlt/All_predY_", modelver, ".csv"))
+  saveRDS(modelResultAll, file = paste0(getwd(), "/", curModelPath, "/rlt/modelResultAll_", modelver, ".rds")) 
+}
+```
+
+
+## Merge the Result data (fit IR data using log model in one step)
+
+```{r}
+mergeAllModelRlt(modellist,  'log')
+```
+
+## Merge the Result data (fit IR data using log model in two steps)
+
+```{r}
+mergeAllModelRlt(modellist,  'log_2part')
+```
+
+## Merge the Result data (fit IR data using linear model in one step)
+
+```{r}
+mergeAllModelRlt(modellist,  'linear')
+```
+
+## Merge the Result data (fit IR data using linear model in two steps)
+
+```{r}
+mergeAllModelRlt(modellist,  'linear_2part')
+```
+
+## Merge all model version together
+
+```{r include=FALSE}
+mergeAllModels <- function(modelverlist){
+  AllDat_Bayparlist <- {}
+  PredY_mix_list <- {}
+  NewY_mix_list <- list()
+  for (i in 1:length(modelverlist)){
+    modelver = modelverlist[i]
+    curModelPath = paste0('RSTANMODELS/models/', modelver)
+    curBayparlist = read_csv(paste0(getwd(), "/", curModelPath, "/rlt/AllDat_Bayparlist_", modelver, ".csv"))
+    AllDat_Bayparlist= rbind(AllDat_Bayparlist, curBayparlist)
+    
+    curPredY_mix_list = read_csv(paste0(getwd(), "/", curModelPath, "/rlt/PredY_mix_list_", modelver, ".csv"))
+    curPredY_mix_list$ver = modelver
+    PredY_mix_list <- rbind(PredY_mix_list, curPredY_mix_list)
+    
+    curNewY_mix_list = read_csv(paste0(getwd(), "/", curModelPath, "/rlt/NewY_mix_list_", modelver, ".csv"))
+    curNewY_mix_list$ver = modelver
+    NewY_mix_list <- rbind(NewY_mix_list, curNewY_mix_list)
+  }
+  
+  
+  write.csv(AllDat_Bayparlist, paste0(getwd(), "/RSTANMODELS/models/AllDat_Bayparlist.csv"))
+  write.csv(PredY_mix_list, paste0(getwd(), "/RSTANMODELS/models/PredY_mix_list.csv"))
+  write.csv(NewY_mix_list, paste0(getwd(), "/RSTANMODELS/models/NewY_mix_list.csv"))
+}
+
+
+ModelVersionList = c('log', 'log_2part', 'linear', 'linear_2part')
+mergeAllModels(ModelVersionList)
+```
+
+
+# merge resluts of Baseline model
+
+```{r}
+#function to merge the baseline model results
+mergeBaselineModelRlt <- function(modelverlist){
+  All_Baseline_Baypar <- {}
+  All_PredY_s <- {}
+  All_PredY_l <- {}
+  All_NewY_s <- {}
+  All_NewY_l <- {}
+  All_PredY_mix <- {}
+  All_NewY_mix <- {}
+  modelResultAll <- list()
+  for(ver in modelverlist){
+    path = paste0('RSTANMODELS/models/Baseline_',ver)
+    bl_rlt = readRDS(paste0(getwd(), "/", path, "/rlt_Baseline_", ver,".rds"))
+    cur_Bayparlist <- {}
+    cur_PredY_s <- {}
+    cur_PredY_l <- {}
+    NewY_s_list <- {}
+    NewY_l_list <- {}
+    PredY_mix_list <- {}
+    NewY_mix_list <- {}
+    for (i in 1:length(bl_rlt)){
+      modelResultAll <- list.append(modelResultAll,bl_rlt[[i]])
+      cur_Bayparlist <- rbind(cur_Bayparlist, bl_rlt[[i]]$Baypar)
+      cur_PredY_s <- rbind(cur_PredY_s, bl_rlt[[i]]$PredY_s_list)
+      cur_PredY_l <- rbind(cur_PredY_l, bl_rlt[[i]]$PredY_l_list)
+      NewY_l_list <- rbind(NewY_l_list, bl_rlt[[i]]$NewY_l_list)
+      NewY_s_list <- rbind(NewY_s_list, bl_rlt[[i]]$NewY_s_list)
+      PredY_mix_list <- rbind(PredY_mix_list, bl_rlt[[i]]$PredY_mix_list)
+      NewY_mix_list <- rbind(NewY_mix_list, bl_rlt[[i]]$NewY_mix_list)
+    }
+    if(ver == 'log'){
+      cur_Bayparlist$mu_p_s = exp(cur_Bayparlist$mu_p_s_log + cur_Bayparlist$sig_pr2_s_log^2*0.5)
+      cur_Bayparlist$sig_pr2_s = (exp(cur_Bayparlist$sig_pr2_s_log^2)-1)*exp(2*cur_Bayparlist$mu_p_s_log+cur_Bayparlist$sig_pr2_s_log^2)
+      cur_Bayparlist$mu_p_l = exp(cur_Bayparlist$mu_p_l_log + cur_Bayparlist$sig_pr2_l_log^2*0.5)
+      cur_Bayparlist$sig_pr2_l = (exp(cur_Bayparlist$sig_pr2_l_log^2)-1)*exp(2*cur_Bayparlist$mu_p_l_log+cur_Bayparlist$sig_pr2_l_log^2)
+    }
+    
+    cur_Bayparlist$ver = ver
+    cur_PredY_s$ver = ver
+    cur_PredY_l$ver = ver
+    NewY_l_list$ver = ver
+    NewY_s_list$ver = ver
+    PredY_mix_list$part = 'all'
+    PredY_mix_list$ver = ver
+    NewY_mix_list$ver = ver
+    if(ver == 'log'){
+      names(cur_Bayparlist)[names(cur_Bayparlist) == "sig2_t"] <- "sig_t"
+      #names(cur_Bayparlist)[names(cur_Bayparlist) == "Nsub"] <- "NSub"
+      cur_Bayparlist <- cur_Bayparlist %>% select(colnames(All_Baseline_Baypar))
+    }
+    
+    All_Baseline_Baypar <- rbind(All_Baseline_Baypar, cur_Bayparlist)
+    All_PredY_s <- rbind(All_PredY_s, cur_PredY_s)
+    All_PredY_l <- rbind(All_PredY_l, cur_PredY_l)
+    All_NewY_l <- rbind(All_NewY_l, NewY_l_list)
+    All_NewY_s <- rbind(All_NewY_s, NewY_s_list)
+    All_PredY_mix <- rbind(All_PredY_mix, PredY_mix_list)
+    All_NewY_mix <- rbind(All_NewY_mix, NewY_mix_list)
+    
+  }
+  write.csv(All_Baseline_Baypar, paste0(getwd(), "/RSTANMODELS/models/baseline_BR_Bayparlist.csv"))
+  write.csv(rbind(All_PredY_s, All_PredY_l), paste0(getwd(), "/RSTANMODELS/models/baseline_BR_PredY.csv"))
+  write.csv(rbind(All_NewY_s, All_NewY_l), paste0(getwd(), "/RSTANMODELS/models/baseline_BR_NewY.csv"))
+  write.csv(All_PredY_mix, paste0(getwd(), "/RSTANMODELS/models/baseline_IR_PredY.csv"))
+  write.csv(All_NewY_mix, paste0(getwd(), "/RSTANMODELS/models/baseline_IR_NewY.csv")) 
+}
+mergeBaselineModelRlt(c('linear', 'log'))
+```
+
+

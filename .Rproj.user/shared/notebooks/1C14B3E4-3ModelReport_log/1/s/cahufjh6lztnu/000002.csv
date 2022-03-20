@@ -1,0 +1,9 @@
+"0","### Modle DIM"
+"0","m_phi = m_Baypar%>%filter(model =='DIM') %>%  group_by(Exp, Nsub) %>%"
+"0","  dplyr::summarize(mm_phi = mean(m_phi), NSub = Nsub)"
+"2","Error: Problem with `summarise()` column `mm_phi`.
+[34mℹ[39m `mm_phi = mean(m_phi)`.
+[31mx[39m error in evaluating the argument 'x' in selecting a method for function 'mean': object 'm_phi' not found
+[34mℹ[39m The error occurred in group 1: Exp = ""Exp1"", Nsub = 1.
+[90mRun `rlang::last_error()` to see where the error occurred.[39m
+"

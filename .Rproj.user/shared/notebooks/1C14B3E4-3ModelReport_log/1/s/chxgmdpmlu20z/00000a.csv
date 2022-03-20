@@ -1,0 +1,2 @@
+"0",""
+"0","write.csv(m_Baypar, paste0(modelPath,""/rlt/m_Baypar_"", logVersion, "".csv"") )"

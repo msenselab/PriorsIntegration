@@ -1,0 +1,8 @@
+"0","#listed in manuscript"
+"0","m_m_mean_sd <- dplyr::group_by(m_mean_sd%>%filter(priortype == 'IR'), Exp, model) %>%"
+"0","  dplyr::summarize( n = n(), "
+"0","                    m_sd_rerr = mean(abs(merr_sig_r)),"
+"0","                    m_merr_mu_r = mean(abs(merr_mu_r))) "
+"1","`summarise()` has grouped output by 'Exp'. You can override using the `.groups` argument.
+"
+"0","m_m_mean_sd  "

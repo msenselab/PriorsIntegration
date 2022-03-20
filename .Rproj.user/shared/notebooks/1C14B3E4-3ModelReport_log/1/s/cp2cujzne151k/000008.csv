@@ -1,0 +1,3 @@
+"0","ggboxplot(AllDat_Bayparlist_2part%>%filter(model !='IP'), x = 'model', y = 'sig2_p_g', color = 'part', add = 'jitter')+"
+"0","  facet_wrap(~Exp)+"
+"0","  scale_color_manual(values = mycolors)"

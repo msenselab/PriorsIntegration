@@ -1,0 +1,1344 @@
+---
+title: "ModelReportAll"
+author: "Xiuna Zhu"
+date: "12/6/2020"
+output:
+  pdf_document: 
+    number_sections: true
+  html_document:
+    df_print: paged
+    number_sections: true
+---
+```{r setup,}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load the packages {-}
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(reshape2)
+library(latex2exp)
+library(rlist)
+library(bayesplot)
+library(ggpubr)
+library(ggridges)
+source('ana_functions.R') 
+source('mytheme.R') 
+linearVerion = 'linear'
+rstanmodelPath = 'RSTANMODELS'
+figure_path = paste0(rstanmodelPath, '/models/figures')
+AllExpData <- read.csv(paste0("data/AllExpData_valid.csv"))
+```
+
+
+# Baseline model results (for BR condition)
+
+## load baseline model results
+```{r include=FALSE}
+#load the parameters from baseline model by fitting BR data 
+baseline_BR_PredY <- read_csv("RSTANMODELS/models/baseline_BR_PredY.csv")
+baseline_BR_PredY$...1 = NULL
+
+baseline_IR_PredY <- read_csv("RSTANMODELS/models/baseline_IR_PredY.csv")
+baseline_IR_PredY$...1  = NULL
+baseline_IR_PredY$model = 'IP_BR'
+```
+
+```{r include=FALSE}
+#load the predicted RP by fitting BR data 
+All_NewY_BR = read_csv("RSTANMODELS/models/baseline_BR_NewY.csv")
+names(All_NewY_BR)[names(All_NewY_BR) == "exp"] <- "Exp"
+names(All_NewY_BR)[names(All_NewY_BR) == "curDur"] <- "targetDur"
+m_NewY_BR <- All_NewY_BR %>% dplyr::group_by(targetDur, Exp, ver, group) %>%
+  dplyr::summarise(m_mu_r = mean(mu_r), m_sig_r = mean(sig_r))
+```
+
+
+
+```{r include=FALSE}
+m_parameter_BR = baseline_BR_PredY %>% dplyr::group_by(targetDur, Exp, group, ver) %>%
+  dplyr::summarise(mRP = mean(RP),  n= n(), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP), sd_mu_r = sd(mu_r), m_wp = mean(wp), sd_wp = sd(wp))
+
+m_parameter_BR_sub = baseline_BR_PredY %>% dplyr::group_by(NSub, Exp, group, ver) %>%
+  dplyr::summarise(mRP = mean(RP),  n= n(), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP),  sd_mu_r = sd(mu_r), m_wp = mean(wp), sd_wp = sd(wp))
+
+mm_parameter_BR = baseline_BR_PredY %>% dplyr::group_by(Exp, group, ver) %>%
+  dplyr::summarise(mRP = mean(RP),  n= n(), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP), sd_mu_r = sd(mu_r), sd_sig_r = sd(sig_r), m_wp = mean(wp), sd_wp = sd(wp))
+```
+
+## BR session data prediction
+
+### plot predicted reproduction based on baseline model
+
+```{r}
+fig_predRP_BR = ggplot(m_parameter_BR, aes(targetDur, m_mu_r)) +
+  geom_point(aes(color= ver)) + 
+  geom_point(aes(targetDur, mRP, shape = 'observed'))+ #observed RP
+  geom_point(data = m_NewY_BR, aes(targetDur, m_mu_r, color = ver), size = 0.3)+
+  facet_wrap(~Exp)+
+  theme_new+ colorSet3 +
+  theme(strip.background = element_blank()) +
+  labs(x = 'Intervals (s)', y = 'Predicted reproduction')+ 
+  #scale_color_manual(labels = c("predicted", "observed"), values = c("blue", "red")) +
+  theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_predRP_BR
+```
+
+
+
+
+### predicted SD of RP
+
+```{r}
+fig_pred_SD_BR = ggplot(m_parameter_BR) +
+  geom_point(aes(targetDur, sd_RP, shape = 'observed'))+ #observed RP
+  geom_line(data = m_NewY_BR, aes(targetDur, m_sig_r, group = interaction(group, ver),color = ver))+
+  facet_wrap(~Exp)+
+  theme_new+ colorSet3 +
+  theme(strip.background = element_blank()) +
+  labs(x = 'Intervals (s)', y = 'Predicted std of RP')+ 
+  theme(legend.position='bottom')+ ggtitle("")
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_pred_SD_BR
+```
+
+### predicted CV 
+
+```{r}
+fig_predCV_BR = ggplot(m_parameter_BR) +
+  geom_point(aes(targetDur, sd_RP/mRP, shape = 'observed'))+ #observed RP
+  geom_line(data = m_NewY_BR, aes(targetDur, m_sig_r/m_mu_r, group = interaction(group, ver),color = ver))+
+  facet_wrap(~Exp)+
+  theme_new+ colorSet3 +
+  theme(strip.background = element_blank()) +
+  labs(x = 'Intervals (s)', y = 'Predicted CV')+ 
+  theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_predCV_BR
+```
+
+
+## plot weight of local prior based on baseline model
+
+```{r}
+ggplot(mm_parameter_BR, aes(x = group, y =m_wp)) +
+  geom_bar(aes(fill = ver), position = 'dodge', stat = "identity")+
+  geom_errorbar(aes(ymin = m_wp-sd_wp, ymax = m_wp + sd_wp, color = ver, width = 0.2),  position = position_dodge(width = 0.9)) +
+  facet_wrap(~Exp)+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'estimated weight of local prior')+
+  theme(legend.position='bottom')
+```
+
+
+```{r}
+fig_wp_BR_subj = ggplot(m_parameter_BR_sub, aes(group, m_wp, color = group)) +
+  geom_boxplot(position = position_dodge(), aes(fill = ver)) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  facet_wrap(~Exp)+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'estimated weight of local prior')+
+  theme(legend.position='bottom')
+
+fig_wp_BR_subj
+```
+## load the estimated parameters from linear baseline model on BR session
+
+```{r include=FALSE}
+baseline_BR_Bayparlist <- read_csv("RSTANMODELS/models/baseline_BR_Bayparlist.csv")
+```
+
+
+## short prior from baseline model
+
+```{r}
+#plot estimated short prior from baseline model
+ggplot(baseline_BR_Bayparlist, aes(Exp, mu_p_s)) + 
+  geom_boxplot(position = position_dodge(), aes(fill = ver)) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'estimated mean of short prior')+ 
+  theme(legend.position='bottom')
+```
+
+```{r}
+ggplot(baseline_BR_Bayparlist, aes(Exp, sig_pr2_s)) + 
+  geom_boxplot(position = position_dodge(), aes(fill = ver)) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'estimated variance of short prior')+ 
+  theme(legend.position='bottom')
+```
+
+
+## long prior from baseline model
+
+```{r}
+## plot estimated long prior from baseline model
+ggplot(baseline_BR_Bayparlist, aes(Exp, mu_p_l)) + 
+  geom_boxplot(position = position_dodge(), aes(fill = ver)) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'estimated mean of long prior')+ 
+  theme(legend.position='bottom')
+```
+```{r}
+ggplot(baseline_BR_Bayparlist, aes(Exp, sig_pr2_l)) + 
+  geom_boxplot(position = position_dodge(), aes(fill = ver)) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'estimated variance of long prior')+ 
+  theme(legend.position='bottom')
+```
+## sig_t from baseline model
+
+Note that $sigma_t$ in linear model indicates weber fraction.
+```{r}
+#plot estimated sig_t from baseline model
+ggplot(baseline_BR_Bayparlist, aes(Exp, sig_t)) + 
+  geom_boxplot(position = position_dodge(), aes(fill = ver)) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'sig_t')+ 
+  theme(legend.position='bottom')
+```
+## variance of montor noise based on baseline model
+
+```{r}
+##plot estimated ariance of montor noise from baseline model
+ggplot(baseline_BR_Bayparlist, aes(Exp, sig2_mn)) + 
+  geom_boxplot(position = position_dodge(), aes(fill = ver)) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  theme_new+ scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = ' ', y = 'estimated variance of montor noise in log')+ 
+  theme(legend.position='bottom')
+```
+
+```{r}
+mpar_baseline_BR <- dplyr::group_by(baseline_BR_Bayparlist, Exp,ver) %>%
+  dplyr::summarize( m_mu_p_s = mean(mu_p_s), 
+                    m_mu_p_l = mean(mu_p_l), 
+                    m_sig_pr2_s = mean(sig_pr2_s),
+                    m_sig_pr2_l = mean(sig_pr2_l),
+                    m_sig2_mn = mean(sig2_mn),
+                    m_sig_t = mean(sig_t))
+```
+
+
+
+```{r}
+# baseline_BR_PredY$targetDur1 = round(baseline_BR_PredY$targetDur, 2)
+# baseline_BR_PredY$targetDur1 = as.factor(baseline_BR_PredY$targetDur1)
+# ggplot(baseline_BR_PredY%>%filter(ver == 'log'), aes(x = RP, y = targetDur1, fill = stat(x))) +
+#   geom_density_ridges_gradient(quantile_lines=TRUE, quantiles = 2, scale = 3, size = 0.3, rel_min_height = 0.01) +
+#   scale_fill_viridis_c(name = "RP", option = "C") +
+#   labs(title = 'reproduction')+facet_grid(~Exp)
+```
+
+  
+```{r}
+dens1 = split(mpar_baseline_BR, list(mpar_baseline_BR$Exp, mpar_baseline_BR$ver)) %>% 
+  map_df(~ tibble(x =seq(0.5, 2.4, 0.01),
+                  density= dnorm(x, mean = 0, sd = sqrt(2)), .id="Exp,ver"))
+```
+
+
+```{r}
+  ggplot(data = data.frame(x = c(0.5, 2.4)), aes(x)) + 
+  geom_function(fun = dnorm, n = 100,  aes(col = "short prior in linear"), args = list(mean = mpar_baseline_BR$m_mu_p_s[1], sd = sqrt(mpar_baseline_BR$m_sig_pr2_s[1])))+ 
+  geom_function(fun = dnorm, n = 100, aes(col ="long prior in linear"), args = list(mean = mpar_baseline_BR$m_mu_p_l[1], sd = sqrt(mpar_baseline_BR$m_sig_pr2_l[1])))+
+  geom_function(fun = dnorm, n = 100, aes(col = "short prior in log"),  args = list(mean = mpar_baseline_BR$m_mu_p_s[2], sd = sqrt(mpar_baseline_BR$m_sig_pr2_s[2])))+
+  geom_function(fun = dnorm, n = 100, aes(col = "long prior in log"), args = list(mean = mpar_baseline_BR$m_mu_p_l[2], sd = sqrt(mpar_baseline_BR$m_sig_pr2_l[2])))+ggtitle("Exp.1")+colorSet4
+```
+
+```{r}
+ggplot(data = data.frame(x = c(0.5, 2.4)), aes(x)) + 
+  geom_function(fun = dnorm, n = 100, show.legend= TRUE, aes(col = "short prior in linear"), args = list(mean = mpar_baseline_BR$m_mu_p_s[3], sd = sqrt(mpar_baseline_BR$m_sig_pr2_s[3])))+ 
+  geom_function(fun = dnorm, n = 100, show.legend= TRUE, aes(col = "long prior in linear"), args = list(mean = mpar_baseline_BR$m_mu_p_l[3], sd = sqrt(mpar_baseline_BR$m_sig_pr2_l[3])))+
+  geom_function(fun = dnorm, n = 100, show.legend= TRUE, aes(col = "short prior in log"), args = list(mean = mpar_baseline_BR$m_mu_p_s[4], sd = sqrt(mpar_baseline_BR$m_sig_pr2_s[4])))+
+  geom_function(fun = dnorm, n = 100, show.legend= TRUE, aes(col = "long prior in log"), args = list(mean = mpar_baseline_BR$m_mu_p_l[4], sd = sqrt(mpar_baseline_BR$m_sig_pr2_l[4])))+ggtitle("Exp.2")+colorSet4
+```
+
+!!! The mean of short prior variance is very small.
+
+
+
+# IR session data prediction
+
+## load the estimated parameter of all models fitting to IR session data and combine the session order information
+
+```{r include=FALSE}
+AllDat_Bayparlist <- read_csv("RSTANMODELS/models/AllDat_Bayparlist.csv")
+
+Exp_session_order = read_csv(paste0(getwd(), '/data/Exp_session_order.csv'))
+Exp_session_order$firstSession[Exp_session_order$firstSession == 'short'] <- 'S-L-M'
+Exp_session_order$firstSession[Exp_session_order$firstSession == 'long'] <- 'L-S-M'
+
+names(Exp_session_order)[names(Exp_session_order) == 'NSub'] <- 'Nsub'
+m_Baypar = left_join(AllDat_Bayparlist, Exp_session_order, by =c('Exp','Nsub'))
+write.csv(m_Baypar, paste0(getwd(), "/generated/m_Baypar.csv"))
+```
+
+
+
+```{r include=FALSE}
+mm_Baypar <- dplyr::group_by(m_Baypar, Exp, model,ver, part, firstSession) %>%
+  dplyr::summarize( m_mu_p_s = mean(mu_p_s_IR), 
+                    m_mu_p_l = mean(mu_p_l_IR), 
+                    m_mu_p_g = mean(mu_p_g), 
+                    m_sig2_p_s = mean(sig_pr2_s_IR),
+                    m_sig2_p_l = mean(sig_pr2_l_IR),
+                    m_sig2_p_g = mean(sig2_p_g),
+                    n = n(),
+                    se_mu_p_s = sd(mu_p_s_IR)/sqrt(n-1),
+                    se_mu_p_l = sd(mu_p_l_IR)/sqrt(n-1),
+                    se_mu_p_g = sd(mu_p_g)/sqrt(n-1),
+                    se_sig2_p_s = sd(sig_pr2_s_IR)/sqrt(n-1),
+                    se_sig2_p_l = sd(sig_pr2_l_IR)/sqrt(n-1),
+                    se_sig2_p_g = sd(sig2_p_g)/sqrt(n-1))
+mm_Baypar
+```
+
+```{r include=FALSE}
+mm_Baypar%>%filter(model !='IP') %>%select(Exp, model,ver, part, firstSession,m_mu_p_g, se_mu_p_g, m_sig2_p_g, se_sig2_p_g)
+
+mmm_Baypar <- dplyr::group_by(m_Baypar, Nsub, Exp, model, ver, part) %>%
+  dplyr::summarize(  m_mu_p_g = mean(mu_p_g),
+                    m_sig2_p_g = mean(sig2_p_g))
+
+mmm_Baypar_so <- dplyr::group_by(m_Baypar, Nsub, firstSession, Exp, model, ver, part) %>%
+  dplyr::summarize(  m_mu_p_g = mean(mu_p_g),
+                    m_sig2_p_g = mean(sig2_p_g))
+```
+
+
+```{r include=FALSE}
+#calculate the difference between session order
+mm_Baypar_order <- mm_Baypar%>%filter(model !='IP')%>%select(Exp, model, ver, part, firstSession, m_mu_p_g, m_sig2_p_g, se_mu_p_g, se_sig2_p_g) %>%
+  unite(data, m_mu_p_g, se_mu_p_g, m_sig2_p_g, se_sig2_p_g)%>%
+  spread(firstSession, data)%>%
+  separate(`L-S-M`, c("m_mu_p_g_long", "se_mu_p_g_long","m_sig2_p_g_long", "se_sig2_p_g_long"), sep = "_")%>%
+  separate(`S-L-M`, c("m_mu_p_g_short", "se_mu_p_g_short","m_sig2_p_g_short", "se_sig2_p_g_short"), sep = "_")
+
+mm_Baypar_order[,5:12]<-sapply(mm_Baypar_order[,5:12],as.numeric)
+mm_Baypar_order$m_mu_p_g_diff = mm_Baypar_order$m_mu_p_g_long - mm_Baypar_order$m_mu_p_g_short
+mm_Baypar_order$se_mu_p_g_diff = mm_Baypar_order$se_mu_p_g_long - mm_Baypar_order$se_mu_p_g_short
+mm_Baypar_order$m_sig2_p_g_diff = mm_Baypar_order$m_sig2_p_g_long - mm_Baypar_order$m_sig2_p_g_short
+mm_Baypar_order$se_sig2_p_g_diff = mm_Baypar_order$se_sig2_p_g_long - mm_Baypar_order$se_sig2_p_g_short
+
+mm_Baypar_order
+```
+
+
+### plot eastimated mean of global prior
+
+```{r}
+plt_gp = ggplot(mmm_Baypar%>%filter(model !='IP', ver == 'log', part == 'all'), aes(model, m_mu_p_g,  group = model, color = model))+ 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  #geom_point(aes(color = model), position = position_dodge(width = mywidth))+ geom_line(aes(color = model), position = position_dodge(width = mywidth))+
+  theme_minimal()+ theme_new + colorSet3+
+  labs(x = "",#one step(all) vs. two steps(part1, part2)
+       y = "estimated mean of global prior")+
+  facet_wrap(~Exp)+ theme(legend.position = "top")
+
+plt_gp
+```
+```{r}
+plt_gp_variance = ggplot(mmm_Baypar%>%filter(model !='IP', ver == 'log', part == 'all'), aes(model, m_sig2_p_g,  group = model, color = model))+ 
+  geom_boxplot(position = position_dodge()) +
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  #geom_point(aes(color = model), position = position_dodge(width = mywidth))+ geom_line(aes(color = model), position = position_dodge(width = mywidth))+
+  theme_minimal()+ theme_new + colorSet3+
+  labs(x = "",
+       y = "estimated variance of global prior")+
+  facet_wrap(~Exp)+ theme(legend.position = "top")
+
+plt_gp_variance
+```
+```{r}
+mmm_Baypar%>%filter(model !='IP', ver == 'log', part == 'all') %>% dplyr::group_by(Exp, model, ver, part) %>%
+  dplyr::summarize(  m_mu_p_g = mean(mu_p_g),
+                    m_sig2_p_g = mean(sig2_p_g))
+```
+
+
+
+### plot eastimated mean of global prior (Session order)
+
+```{r}
+mywidth = 0.4
+plt_gp_log = ggplot(mm_Baypar%>%filter(model !='IP', ver == 'log'), aes(part, m_mu_p_g,  group = interaction(model, firstSession), color = model, shape = firstSession))+ 
+  geom_point(aes(color = model), position = position_dodge(width = mywidth))+ geom_line(aes(color = model, linetype = firstSession), position = position_dodge(width = mywidth))+
+  geom_errorbar(aes(ymin = m_mu_p_g -se_mu_p_g , ymax = m_mu_p_g + se_mu_p_g, color = model),position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet3+
+  labs(x = "mix session dataset",#one step(all) vs. two steps(part1, part2)
+       y = "estimated global prior", linetype = 'session order', shape = "session order")+
+  facet_wrap(~Exp)+ theme(legend.position = "top")
+ggsave(file.path(figure_path,'plt_gp_log.png'), plt_gp_log, width = 4, height = 3)
+
+plt_gp_log
+```
+
+
+```{r}
+mywidth = 0.2
+plt_gp_log1 = ggplot(mm_Baypar%>%filter(model !='IP', ver == 'log', part == 'all'), aes(model, m_mu_p_g, group =interaction(Exp, firstSession), color = firstSession, shape = Exp))+ 
+  geom_point(aes(color = firstSession), position = position_dodge(width = mywidth))+ geom_line(aes(color = firstSession, linetype = Exp, shape = Exp), position = position_dodge(width = mywidth))+
+  geom_errorbar(aes(ymin = m_mu_p_g -se_mu_p_g , ymax = m_mu_p_g + se_mu_p_g, color = firstSession),position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + # colorSet3+
+  labs(x = "",
+       y = "Estimated global prior", linetype = 'Experiment', shape = 'Experiment', color = 'Session order')+
+ theme(legend.position = "top")+
+  scale_color_manual(values = mycolors)
+
+ggsave(file.path(figure_path,'plt_gp_log1.png'), plt_gp_log1, width = 5.5, height = 4)
+
+plt_gp_log1
+```
+
+Interesting results!
+
+1. For both session order, we observed the similar pattern of global prior .
+2. When long session was taken as the first session, the mean of global prior was smaller than the condition of short session as the first session.
+
+
+```{r}
+plt_gp = ggplot(mm_Baypar%>%filter(model !='IP'), aes(part, m_mu_p_g,  group = interaction(model, firstSession), color = model, shape = firstSession))+ 
+  geom_point(aes(color = model), position = position_dodge(width = mywidth))+ geom_line(aes(color = model, linetype = firstSession), position = position_dodge(width = mywidth))+
+  geom_errorbar(aes(ymin = m_mu_p_g -se_mu_p_g , ymax = m_mu_p_g + se_mu_p_g, color = model, width=.8),position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet3+
+  labs(x = "mix session dataset", #one step(all) vs. two steps(part1, part2)
+       y = "estimated global prior", linetype = '', shape = "")+
+  facet_wrap(ver~Exp, nrow = 1)
+plt_gp
+```
+
+
+
+### plot eastimated variance of global prior in IP model (IR data)
+
+```{r}
+plt_gp_var_log = ggplot(mm_Baypar%>%filter(model !='IP', ver == 'log'), aes(part, m_sig2_p_g,  group = interaction(model, firstSession), color = model, shape = firstSession))+ 
+  geom_point(aes(color = model), position = position_dodge(width = mywidth))+ geom_line(aes(color = model, linetype = firstSession), position = position_dodge(width = mywidth))+
+  geom_errorbar(aes(ymin = m_sig2_p_g -se_sig2_p_g , ymax = m_sig2_p_g + se_sig2_p_g, color = model, width=.8),position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet3+
+  labs(x = "mix session dataset", #one step(all) vs. two steps(part1, part2)
+       y = "estimated variance of global prior", linetype = 'session order', shape = "session order")+
+  facet_wrap(~Exp, nrow = 1)
+plt_gp_var_log
+```
+
+
+```{r}
+mywidth = 0.4
+plt_gp_var_log1 = ggplot(mm_Baypar%>%filter(model !='IP', ver == 'log', part == 'all'), aes(model, m_sig2_p_g, group =interaction(Exp, firstSession), color = firstSession, shape = Exp))+ 
+  geom_point(aes(color = firstSession), position = position_dodge(width = mywidth))+ geom_line(aes(color = firstSession, linetype = Exp, shape = Exp), position = position_dodge(width = mywidth))+
+  geom_errorbar(aes(ymin = m_sig2_p_g -se_sig2_p_g , ymax = m_sig2_p_g + se_sig2_p_g, color = firstSession),position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + 
+  labs(x = "",
+       y = "Estimated variance of global prior", linetype = 'Experiment', shape = 'Experiment',  color = 'Session order')+
+ theme(legend.position = "top")+
+  scale_color_manual(values = mycolors)
+
+ggsave(file.path(figure_path,'plt_gp_var_log1.png'), plt_gp_var_log1, width = 6, height = 4)
+
+plt_gp_var_log1
+```
+
+
+```{r}
+plt_gp_var = ggplot(mm_Baypar%>%filter(model !='IP'), aes(part, m_sig2_p_g,  group = interaction(model, firstSession), color = model, shape = firstSession))+ 
+  geom_point(aes(color = model), position = position_dodge(width = mywidth))+ geom_line(aes(color = model, linetype = firstSession), position = position_dodge(width = mywidth))+
+  geom_errorbar(aes(ymin = m_sig2_p_g -se_sig2_p_g , ymax = m_sig2_p_g + se_sig2_p_g, color = model, width=.8),position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet3+
+  labs(x = "mix session dataset", #one step(all) vs. two steps(part1, part2)
+       y = "estimated variance of global prior", linetype = '', shape = "session order")+
+  facet_wrap(ver~Exp, nrow = 1)
+plt_gp_var
+```
+
+
+The variance of global prior in Exp1 for part1, part2, and all are high, medium and low, respectively. 
+
+But Exp2 have different pattern, compared to Exp1. part2 has higher variance of global prior than part1. How to explain this?
+
+
+#### difference of global prior variance based on session order (L-S-M - S-L-M)
+
+Interesting results! (How to explain that the DIM Exp1 is different with other conditions? )
+
+```{r}
+fig_globalPrior_log <- ggarrange(plt_gp_log, plt_gp_var_log, common.legend = TRUE, nrow = 1,ncol = 2, labels = c('a', 'b'))
+ggsave(file.path(figure_path,'fig_globalPrior_log.png'), fig_globalPrior_log, width = 8, height = 4)
+fig_globalPrior_log
+```
+
+```{r}
+fig_globalPrior_log1 <- ggarrange(plt_gp_log1, plt_gp_var_log1, common.legend = TRUE, nrow = 1,ncol = 2, labels = c('a', 'b'))
+ggsave(file.path(figure_path,'fig_globalPrior_log1.png'), fig_globalPrior_log1, width = 8, height = 4)
+  fig_globalPrior_log1
+```
+
+
+
+```{r}
+fig_globalPrior <- ggarrange(plt_gp, plt_gp_var, common.legend = TRUE, nrow = 2,ncol = 1, labels = c('a', 'b'))
+ggsave(file.path(figure_path,'fig_globalPrior.png'), fig_globalPrior, width = 8, height = 8)
+fig_globalPrior
+```
+
+
+### Anonva on estimated global prior
+
+```{r}
+ezANOVA(data = mmm_Baypar %>% filter(model != 'IP', ver == 'log', part =='all'), dv = m_mu_p_g, wid=Nsub, within=.(model), between =Exp,  return_aov = TRUE, detailed = TRUE)
+```
+
+
+```{r}
+library('lsr')
+library('DescTools')
+aov.within=aov(m_mu_p_g ~ model*Exp + Nsub, data=mmm_Baypar %>% filter(model != 'IP', ver == 'log', part =='all'))
+etaSquared(aov.within)
+#etasq(aov.within)
+```
+
+
+```{r}
+mmm_Baypar$Nsub = as.factor(mmm_Baypar$Nsub)
+mmm_Baypar$Exp = as.factor(mmm_Baypar$Exp)
+mmm_Baypar$model = as.factor(mmm_Baypar$model)
+bf = anovaBF(m_mu_p_g ~ model*Exp + Nsub, data=mmm_Baypar %>% filter(model != 'IP', ver == 'log', part =='all') )
+bf_model <- bf[3]/bf[2]
+bf_Exp <- bf[3]/bf[1]
+#Prior type * ragne interaction 
+bf_int <- bf[4]/bf[3] 
+```
+
+
+
+```{r}
+ezANOVA(data = m_Baypar %>% filter(ver == 'log', model == 'LGM'), dv = mu_p_g, wid=Nsub, within_full=.(firstSession, part), between =Exp)
+```
+```{r}
+ezANOVA(data = m_Baypar %>% filter(ver == 'log', model == 'PIM'), dv = mu_p_g, wid=Nsub, within_full=.(firstSession, part), between =Exp)
+```
+```{r}
+ezANOVA(data = m_Baypar %>% filter(ver == 'log', model == 'DIM'), dv = mu_p_g, wid=Nsub, within_full=.(firstSession, part), between =Exp)
+```
+
+### Anonva on estimated mean of global prior (Session order)
+```{r}
+dat_mmm_Baypar_so = mmm_Baypar_so %>% filter(model != 'IP', ver == 'log', part =='all')
+dat_mmm_Baypar_so$ver = NULL
+dat_mmm_Baypar_so$part = NULL
+
+jasp_globalprior_exp_SO <- dat_mmm_Baypar_so%>% 
+    unite(p_g, m_mu_p_g, m_sig2_p_g)%>%
+    spread(model, p_g)%>%
+    separate(`DIM`, c("DIM_mu_p_g", "DIM_sig2_p_g"), sep = "_")%>%
+    separate(`LGM`, c("LGM_mu_p_g", "LGM_sig2_p_g"), sep = "_")%>%
+    separate(`PIM`, c("PIM_mu_p_g", "PIM_sig2_p_g"), sep = "_")
+  
+write.csv(jasp_globalprior_exp_SO, file = paste0("jasp/jasp_globalprior_exp_SO.csv"))
+  
+  
+
+ezANOVA(data = , dv = m_mu_p_g, wid=Nsub, within=.(model), between =.(Exp,firstSession),  return_aov = TRUE, detailed = TRUE)
+```
+
+
+
+
+### Anonva on estimated variance of global prior
+
+```{r}
+ezANOVA(data = mmm_Baypar %>% filter(model != 'IP', ver == 'log', part =='all'), dv = m_sig2_p_g, wid=Nsub, within=.(model), between =Exp,  return_aov = TRUE, detailed = TRUE)
+```
+
+
+```{r}
+aov.within=aov(m_sig2_p_g ~ model*Exp + Nsub, data=mmm_Baypar %>% filter(model != 'IP', ver == 'log', part =='all'))
+etaSquared(aov.within)
+#etasq(aov.within)
+```
+```{r}
+bf = anovaBF(m_sig2_p_g ~ model*Exp + Nsub, data=mmm_Baypar %>% filter(model != 'IP', ver == 'log', part =='all') )
+bf_model <- bf[3]/bf[2]
+bf_Exp <- bf[3]/bf[1]
+#Prior type * ragne interaction 
+bf_int <- bf[4]/bf[3] 
+```
+
+## plot parameters for Indipendent Prior(IP) model on IR data
+
+### plot eastimated mean of prior for short range in IP model (IR data)
+
+```{r}
+ggplot(mm_Baypar%>%filter(model =='IP'), aes(part, m_mu_p_s, group = interaction(Exp, firstSession, ver) ))+ 
+  geom_point(aes(color = interaction(ver, firstSession), shape = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_line(aes(color = interaction(ver, firstSession), linetype = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_errorbar(aes(ymin = m_mu_p_s -se_mu_p_s , ymax = m_mu_p_s + se_mu_p_s, color = interaction(ver, firstSession)), position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet4+
+  labs(x = "mix session dataset",
+       y = "mean of local prior for short range")+
+  facet_wrap(~Exp)
+```
+
+### plot eastimated mean of prior for long range in IP model (IR data)
+
+
+```{r}
+ggplot(mm_Baypar%>%filter(model =='IP'), aes(part, m_mu_p_l, group = interaction(Exp, firstSession, ver) ))+ 
+  geom_point(aes(color = interaction(ver, firstSession), shape = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_line(aes(color = interaction(ver, firstSession), linetype = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_errorbar(aes(ymin = m_mu_p_l -se_mu_p_l , ymax = m_mu_p_l + se_mu_p_l, color = interaction(ver, firstSession)), position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet4+
+  labs(x = "mix session dataset",#one step(all) vs. two steps(part1, part2)
+       y = "mean of long prior")+
+  facet_wrap(~Exp)
+```
+### plot variance of local prior for long range in IP model
+
+```{r}
+# ggplot(mm_Baypar%>%filter(model =='IP'), aes(part, m_sig2_p_l))+ 
+#   geom_bar(aes(fill = ver), stat = "identity",position = 'dodge')+ 
+#   geom_errorbar(aes(ymin = m_sig2_p_l -se_sig2_p_l, ymax = m_sig2_p_l + se_sig2_p_l, color = ver, width=.2), position = position_dodge(width = 0.9)) +
+#   theme_minimal()+ theme_new +
+#   labs(x = "one step(all) vs. two steps(part1, part2)",
+#        y = "variance of long prior in IP model")+
+#   facet_wrap(firstSession~Exp)
+```
+
+```{r}
+ggplot(mm_Baypar%>%filter(model =='IP'), aes(part, m_sig2_p_l, group = interaction(Exp, firstSession, ver) ))+ 
+  geom_point(aes(color = interaction(ver, firstSession), shape = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_line(aes(color = interaction(ver, firstSession), linetype = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_errorbar(aes(ymin = m_sig2_p_l -se_sig2_p_l , ymax = m_sig2_p_l + se_sig2_p_l, color = interaction(ver, firstSession)), position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet4+
+  labs(x = "mix session dataset",
+       y = "variance of long prior", color = "")+
+  facet_wrap(~Exp)+
+  scale_linetype(guide = "none")+scale_shape(guide = "none")
+```
+
+### plot variance of local prior for short range in IP model
+
+```{r}
+# ggplot(mm_Baypar%>%filter(model =='IP'), aes(part, m_sig2_p_s))+ 
+#   geom_bar(aes(fill = ver), stat = "identity",position = 'dodge')+ 
+#   geom_errorbar(aes(ymin = m_sig2_p_s -se_sig2_p_s, ymax = m_sig2_p_s + se_sig2_p_s, color = ver, width=.2), position = position_dodge(width = 0.9)) +
+#   theme_minimal()+ theme_new +
+#   labs(x = "one step(all) vs. two steps(part1, part2)",
+#        y = "variance of prior for short range")+
+#   facet_wrap(firstSession~Exp)
+```
+
+```{r}
+ggplot(mm_Baypar%>%filter(model =='IP'), aes(part, m_sig2_p_s, group = interaction(Exp, firstSession, ver) ))+ 
+  geom_point(aes(color = interaction(ver, firstSession), shape = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_line(aes(color = interaction(ver, firstSession), linetype = firstSession), position = position_dodge(width = mywidth))+ 
+  geom_errorbar(aes(ymin = m_sig2_p_s -se_sig2_p_s , ymax = m_sig2_p_s + se_sig2_p_s, color = interaction(ver, firstSession)), position = position_dodge(width = mywidth)) +
+  theme_minimal()+ theme_new + colorSet4+
+  labs(x = "mix session dataset", #one step(all) vs. two steps(part1, part2)
+       y = "variance of short prior", color = "")+
+  facet_wrap(~Exp)+
+  scale_linetype(guide = "none")+scale_shape(guide = "none")
+```
+
+
+# Prediction results from models for IR session data
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+#load prediction generated by models
+All_predY <- read_csv("RSTANMODELS/models/PredY_mix_list.csv")  #IR data fitting results
+#merge IP_BR model to All_predY
+predYcolnames = c("NSub", "targetDur","RP", "Exp", "group","model","mu_r", "sig_r", "predY", "log_lik","W_P_G", "W_L","W_Ds", "part", "ver")
+All_predY = rbind(All_predY%>%select(predYcolnames), baseline_IR_PredY%>%select(predYcolnames))
+
+All_predY$model <- as.factor(All_predY$model)
+#All_predY$RP_BIAS = All_predY$RP- All_predY$targetDur
+#All_predY$prederr = All_predY$mu_r - All_predY$RP #prediction error
+#All_predY$predBIAS = All_predY$mu_r- All_predY$targetDur
+#All_predY$predNBIAS = abs(All_predY$mu_r- All_predY$targetDur)
+All_predY$range = "short"
+All_predY[which(All_predY$targetDur>1),"range"] = "long"
+All_predY$range = as.factor(All_predY$range)
+```
+
+```{r include=FALSE}
+newYcolnames = c("NSub", "curDur","exp", "group","model","mu_r", "sig_r",  "log_lik","W_P_G", "W_L","W_Ds", "part", "ver")
+NewY_mix_list <- read_csv("RSTANMODELS/models/NewY_mix_list.csv")
+baseline_IR_NewY <- read_csv("RSTANMODELS/models/baseline_IR_NewY.csv")
+baseline_IR_NewY$part = "all"
+baseline_IR_NewY$model = 'IP_BR'
+
+NewY_mix_list = rbind(NewY_mix_list%>%select(newYcolnames), baseline_IR_NewY%>%select(newYcolnames))
+names(NewY_mix_list)[names(NewY_mix_list) == "curDur"] <- "targetDur"
+names(NewY_mix_list)[names(NewY_mix_list) == "exp"] <- "Exp"
+NewY_mix_list$range = "short"
+NewY_mix_list[which(NewY_mix_list$targetDur>1),"range"] = "long"
+NewY_mix_list$range = as.factor(NewY_mix_list$range)
+```
+
+
+
+
+## Weights of global prior
+
+```{r include=FALSE}
+select_colnames = c("NSub", "targetDur", "model", "Exp", "W_Ds", "W_P_G", "W_L", "ver", "part", "range")
+PredY_mixed_dat = All_predY%>% filter(model !='IP', model !='IP_BR') %>% filter(part == 'all') %>% select(select_colnames)
+
+write.csv(PredY_mixed_dat, paste0(getwd(), "/generated/PredY_mixed_dat.csv"))
+
+#### check if the sum of weights of Ds, PG, PL is equals to 1
+PredY_mixed_dat$total = PredY_mixed_dat$W_Ds + PredY_mixed_dat$W_P_G + PredY_mixed_dat$W_L
+```
+
+
+```{r}
+mweight = PredY_mixed_dat %>%group_by(model, Exp, ver, part, range) %>%
+  dplyr::summarize(m_W_Ds = mean(W_Ds),
+                   m_W_P_G = mean(W_P_G), 
+                   m_W_L = mean(W_L), 
+                   n = n(),
+                   se_W_Ds= sd(W_Ds)/sqrt(n-1),
+                   se_W_P_G = sd(W_P_G)/sqrt(n-1),
+                   se_W_L = sd(W_L)/sqrt(n-1))
+```
+
+```{r}
+plt_W_Ds = mweight %>% ggplot(aes(range, m_W_Ds, group = interaction(model, Exp, ver), color = model, shape = ver)) + 
+  geom_line(aes(linetype = Exp),position = position_dodge(width = mywidth))+ geom_point(position = position_dodge(width = mywidth), size = 1) + colorSet6+
+  geom_errorbar(aes(ymin = m_W_Ds - se_W_Ds, ymax = m_W_Ds + se_W_Ds), position = position_dodge(width = mywidth)) +
+  xlab('range') + ylab('Weight of Ds')+ theme_new
+plt_W_Ds
+```
+```{r}
+plt_W_P_G = mweight %>% ggplot(aes(range, m_W_P_G, group = interaction(model, Exp, ver), color = model, shape = ver)) + geom_line(aes(linetype = Exp), position = position_dodge(width = mywidth))+ geom_point(position = position_dodge(width = mywidth), size = 1) + colorSet4+
+  geom_errorbar(aes(ymin = m_W_P_G - se_W_P_G, ymax = m_W_P_G + se_W_P_G ), position = position_dodge(width = mywidth)) +
+  xlab('range') + ylab('Weight of global prior')+ labs(shape = 'version')+ theme_new+
+   scale_shape_manual(labels = c("linear", "logarithmic"), values = c("triangle", "circle"))
+plt_W_P_G
+```
+```{r}
+plt_W_L = mweight %>% ggplot(aes(range, m_W_L, group = interaction(model, Exp, ver), color =model, shape = ver)) + 
+  geom_line(aes(linetype = Exp), position = position_dodge(width = mywidth))+ geom_point(position = position_dodge(width = mywidth), size = 1) + colorSet3+
+  geom_errorbar(aes(ymin = m_W_L - se_W_L, ymax = m_W_L + se_W_L),  position = position_dodge(width = mywidth)) +
+  xlab('range') + ylab('Weight of local prior')+ theme_new 
+plt_W_L
+```
+
+
+
+```{r}
+fig_weight <- ggarrange(plt_W_P_G, plt_W_L, plt_W_Ds, common.legend = TRUE, nrow = 1,ncol = 3, labels = c('a', 'b', 'c'))
+ggsave(file.path(figure_path,'fig_weight.png'), fig_weight, width = 8, height = 4)
+fig_weight
+```
+
+
+
+### plot weight of priors
+
+```{r}
+mweight2 = PredY_mixed_dat %>%group_by(model, Exp, ver, part) %>%
+  dplyr::summarize(m_W_Ds = mean(W_Ds),
+                   m_W_P_G = mean(W_P_G), 
+                   m_W_L = mean(W_L), 
+                   n = n(),
+                   se_W_Ds= sd(W_Ds)/sqrt(n-1),
+                   se_W_P_G = sd(W_P_G)/sqrt(n-1),
+                   se_W_L = sd(W_L)/sqrt(n-1))
+```
+
+```{r}
+mweight_localprior = PredY_mixed_dat %>%group_by(model, Exp, ver, part, range) %>%
+  dplyr::summarize( m_W_L = mean(W_L), 
+                   n = n(),
+                   se_W_L = sd(W_L)/sqrt(n-1))
+```
+
+```{r}
+plt_W_Ds = mweight2 %>% ggplot(aes(model, m_W_Ds, group = interaction(ver, Exp), color = ver, shape = Exp)) + 
+  geom_line(aes(linetype = Exp),position = position_dodge(width = mywidth))+ geom_point(position = position_dodge(width = mywidth), size = 2.5) +
+  geom_errorbar(aes(ymin = m_W_Ds - se_W_Ds, ymax = m_W_Ds + se_W_Ds), position = position_dodge(width = mywidth)) +
+  scale_color_manual(values = mycolors)+
+  xlab('') + ylab('Weight of sensory measurement')+ theme_new
+
+plt_W_Ds
+```
+```{r}
+plt_W_P_G = mweight2  %>% ggplot(aes(model, m_W_P_G, group = interaction(ver, Exp), color = ver, shape = Exp)) + geom_line(aes(linetype = Exp), position = position_dodge(width = mywidth))+ geom_point(position = position_dodge(width = mywidth), size = 1) +
+  geom_errorbar(aes(ymin = m_W_P_G - se_W_P_G, ymax = m_W_P_G + se_W_P_G ), position = position_dodge(width = mywidth)) +
+  xlab('') + ylab('Weight of global prior')+ labs(color = 'encoding')+ theme_new+
+   scale_color_manual(labels = c("linear", "logarithmic"), values = mycolors)
+plt_W_P_G 
+```
+```{r}
+plt_W_L = mweight2  %>% ggplot(aes(model, m_W_L, group = interaction(ver, Exp), color = ver, shape = Exp)) + 
+  geom_line(aes(linetype = Exp), position = position_dodge(width = mywidth))+ 
+  geom_point(position = position_dodge(width = mywidth), size = 1) +
+  geom_errorbar(aes(ymin = m_W_L - se_W_L, ymax = m_W_L + se_W_L),  position = position_dodge(width = mywidth)) +
+  xlab('') + ylab('Weight of local prior')+ theme_new +
+  scale_color_manual(values = mycolors)
+plt_W_L
+```
+
+
+
+```{r}
+fig_weight2 <- ggarrange(plt_W_P_G, plt_W_L, plt_W_Ds, common.legend = TRUE, nrow = 1,ncol = 3, labels = c('a', 'b', 'c'))
+ggsave(file.path(figure_path,'fig_weight2.png'), fig_weight2, width = 8, height = 3.5)
+fig_weight2
+```
+
+```{r}
+plt_W_Ds_log = mweight2%>%filter(ver == 'log') %>% ggplot(aes(model, m_W_Ds, group = Exp, color = Exp)) + 
+  geom_line(position = position_dodge(width = mywidth))+ geom_point(position = position_dodge(width = mywidth), size = 1) + #colorSet3+
+  geom_errorbar(aes(ymin = m_W_Ds - se_W_Ds, ymax = m_W_Ds + se_W_Ds), position = position_dodge(width = mywidth)) +
+  xlab('') + ylab('Weight of sensory measurement')+
+  scale_color_manual(values = mycolors)
+plt_W_Ds_log
+```
+```{r}
+plt_W_P_G_log = mweight2 %>%filter(ver == 'log') %>% ggplot(aes(model, m_W_P_G, group =  Exp, color = Exp, shape = Exp)) + geom_line(position = position_dodge(width = mywidth))+ geom_point(position = position_dodge(width = mywidth), size = 1) + #colorSet3+
+  geom_errorbar(aes(ymin = m_W_P_G - se_W_P_G, ymax = m_W_P_G + se_W_P_G ), position = position_dodge(width = mywidth)) +
+  xlab('') + ylab('Weight of global prior')+ theme_new+
+  scale_color_manual(values = mycolors)
+plt_W_P_G_log
+```
+```{r}
+plt_W_L_log = mweight2  %>%filter(ver == 'log') %>% ggplot(aes(model, m_W_L, group = Exp, color = Exp, shape = Exp)) + 
+  geom_line(position = position_dodge(width = mywidth))+ 
+  geom_point(position = position_dodge(width = mywidth), size = 1) +# colorSet3+
+  geom_errorbar(aes(ymin = m_W_L - se_W_L, ymax = m_W_L + se_W_L),  position = position_dodge(width = mywidth)) +
+  xlab('') + ylab('Weight of local prior')+ theme_new +
+  scale_color_manual(values = mycolors)
+plt_W_L_log
+```
+
+
+
+```{r}
+fig_weight2_log <- ggarrange(plt_W_P_G_log, plt_W_L_log, plt_W_Ds_log, common.legend = TRUE, nrow = 1,ncol = 3, labels = c('a', 'b', 'c'))
+ggsave(file.path(figure_path,'fig_weight2_log.png'), fig_weight2_log, width = 8, height = 3.5)
+fig_weight2_log
+```
+
+
+### anova on weight of prior
+
+```{r}
+mweight_sub = PredY_mixed_dat %>% filter(part == 'all', ver == 'log')%>%group_by(NSub, model, Exp) %>%
+  dplyr::summarize(m_W_Ds = mean(W_Ds),
+                   m_W_P_G = mean(W_P_G), 
+                   m_W_L = mean(W_L), 
+                   n = n(),
+                   se_W_Ds= sd(W_Ds)/sqrt(n-1),
+                   se_W_P_G = sd(W_P_G)/sqrt(n-1),
+                   se_W_L = sd(W_L)/sqrt(n-1))
+write.csv(mweight_sub, paste0(getwd(), "/generated/mweight_sub.csv"))
+```
+
+```{r}
+ezANOVA(data = mweight_sub, dv= m_W_P_G, wid=NSub, within=.(model), between= Exp)
+```
+```{r}
+library(BayesFactor)
+mweight_sub$NSub = as.factor(mweight_sub$NSub)
+mweight_sub$Exp = as.factor(mweight_sub$Exp)
+bf <- anovaBF(m_W_P_G ~ model*Exp + NSub, data = mweight_sub, whichRandom = "NSub")
+summary(bf)
+bf_model <- bf[3]/bf[2]
+bf_Exp <- bf[3]/bf[1]
+bf_int <- bf[4]/bf[3]  #Prior type * ragne interaction
+```
+
+
+```{r}
+ezANOVA(data = mweight_sub, dv= m_W_Ds, wid=NSub, within=.(model), between= Exp)
+```
+```{r}
+bf <- anovaBF(m_W_Ds ~ model*Exp + NSub, data = mweight_sub, whichRandom = "NSub")
+bf_model <- bf[3]/bf[2]
+
+bf_Exp <- bf[3]/bf[1]
+
+#Prior type * ragne interaction 
+bf_int <- bf[4]/bf[3] 
+```
+
+```{r}
+ezANOVA(data = mweight_sub, dv= m_W_L, wid=NSub, within=.(model), between= Exp)
+```
+```{r}
+bf <- anovaBF(m_W_L ~ model*Exp + NSub, data = mweight_sub, whichRandom = "NSub")
+bf_model <- bf[3]/bf[2]
+
+bf_Exp <- bf[3]/bf[1]
+
+#Prior type * ragne interaction 
+bf_int <- bf[4]/bf[3] 
+```
+
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='LGM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='LGM')
+t.test(dat1$m_W_P_G, dat2$m_W_P_G, paired = TRUE, alternative = "two.sided")
+```
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='DIM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='DIM')
+t.test(dat1$m_W_P_G, dat2$m_W_P_G, paired = TRUE, alternative = "two.sided")
+```
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='PIM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='PIM')
+t.test(dat1$m_W_P_G, dat2$m_W_P_G, paired = TRUE, alternative = "two.sided")
+```
+
+
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='LGM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='LGM')
+t.test(dat1$m_W_Ds, dat2$m_W_Ds, paired = TRUE, alternative = "two.sided")
+```
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='DIM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='DIM')
+t.test(dat1$m_W_Ds, dat2$m_W_Ds, paired = TRUE, alternative = "two.sided")
+```
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='PIM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='PIM')
+t.test(dat1$m_W_Ds, dat2$m_W_Ds, paired = TRUE, alternative = "two.sided")
+```
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='LGM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='LGM')
+t.test(dat1$m_W_L, dat2$m_W_L, paired = TRUE, alternative = "two.sided")
+```
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='DIM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='DIM')
+t.test(dat1$m_W_L, dat2$m_W_L, paired = TRUE, alternative = "two.sided")
+```
+```{r}
+dat1 = mweight_sub%>%filter(Exp == 'Exp1', model =='PIM')
+dat2 = mweight_sub%>%filter(Exp == 'Exp2', model =='PIM')
+t.test(dat1$m_W_L, dat2$m_W_L, paired = TRUE, alternative = "two.sided")
+```
+
+
+## goodness of model
+
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+gp_var_sub <- c('NSub', 'Exp', 'model', 'range', 'ver', 'part')
+m_predY_sub <- summarizePredY2(All_predY, gp_var_sub)
+
+gp_var_sub <- c('NSub', 'Exp', 'model', 'ver', 'part')
+m_predY_sub_new <- summarizePredY2(All_predY, gp_var_sub)
+
+
+gp_var <- c('targetDur', 'Exp', 'model', 'range', 'ver', 'part')
+m_predY <- summarizePredY2(All_predY, gp_var)
+m_newY <- summarizeNewY2(NewY_mix_list, gp_var)
+
+predY_err_new <- m_predY_sub %>%dplyr::group_by(Exp, model, ver, part) %>%
+  dplyr::summarize(n= n(),
+                   mm_mu_r = mean(m_mu_r),
+                   mm_m_RP = mean(m_RP),
+                   mm_sd_RP = mean(sd_RP),
+                   mm_sig_r = mean(m_sig_r),
+                   mm_pred_NBIAS = mean(abs(m_mu_r-m_RP)),
+                   mm_pred_Var_BIAS = mean(m_sig_r-sd_RP),
+                   mm_pred_Var_NBIAS = mean(abs(m_sig_r-sd_RP)),
+                   se_pred_RP_BIAS = sd(m_mu_r-m_RP)/sqrt(n-1),
+                   se_pred_Var = sd(m_sig_r- sd_RP)/sqrt(n-1))
+predY_err_new$acc_err <- 100*(1-predY_err_new$mm_pred_NBIAS/predY_err_new$mm_m_RP)
+predY_err_new$acc_var <- 100*(1-predY_err_new$mm_pred_Var_NBIAS/predY_err_new$mm_sd_RP)
+
+m_predY_sub_new <- m_predY_sub %>%dplyr::group_by(NSub, Exp, model, ver, part) %>%
+  dplyr::summarize(n= n(),
+                   mm_mu_r = mean(m_mu_r),
+                   mm_m_RP = mean(m_RP),
+                   mm_sd_RP = mean(sd_RP),
+                   mm_sig_r = mean(m_sig_r),
+                   mm_pred_NBIAS = mean(abs(m_mu_r-m_RP)),
+                   mm_pred_Var_BIAS = mean(m_sig_r- sd_RP),
+                   mm_pred_Var_NBIAS = mean(abs(m_sig_r- sd_RP)),
+                   se_pred_RP_BIAS = sd(m_mu_r-m_RP)/sqrt(n-1),
+                   se_pred_Var = sd(m_sig_r- sd_RP)/sqrt(n-1))
+
+```
+
+```{r}
+predY_err_new%>%filter(ver == 'log', part == 'all', model %in% c('LGM', 'DIM', 'PIM')) %>%select("Exp", "model", "acc_err" , "acc_var")
+```
+
+
+## prediction of RP
+
+### RP
+
+```{r}
+RP_log  <- ggplot(data = m_predY%>%filter(part == 'all', ver == 'log', model %in% c('LGM', 'DIM', 'PIM')), aes(x = targetDur, y = m_RP,  group =interaction(range, Exp, model), shape=as.factor('Observation'))) +
+  geom_point(size=1.5, alpha = 0.5)+
+  geom_line(data= m_newY%>%filter(part == 'all', ver == 'log', model %in% c('LGM', 'DIM', 'PIM')), aes(x=targetDur, y=m_mu_r,  group =interaction(range, Exp, model), color=model)) +
+  geom_abline(slope=1, intercept=0)+
+  facet_wrap(ver~Exp, nrow = 1) +
+  labs(x="Sample intervals (s)", y="Reproduction (s)", color = "Model")+
+  theme_new+colorSet5+guides(shape="none")
+
+ggsave(file.path(figure_path,'figures/pred_RP_log.png'), RP_log, width = 9, height = 5)
+
+RP_log
+```
+
+
+```{r}
+RP_log_Exp1  <- ggplot(data = m_predY%>%filter(part == 'all', ver == 'log', Exp == 'Exp1', model %in% c('LGM', 'DIM', 'PIM')), aes(x = targetDur, y = m_RP,  group =interaction(range, Exp, model), shape=as.factor('Observation'))) +
+  geom_point(size=1.5, alpha = 0.5)+
+  geom_line(data= m_newY%>%filter(part == 'all', ver == 'log', Exp == 'Exp1', model %in% c('LGM', 'DIM', 'PIM')), aes(x=targetDur, y=m_mu_r,  group =interaction(range, Exp, model), color=model)) +
+  geom_abline(slope=1, intercept=0)+
+  facet_wrap(~Exp, nrow = 1) +
+  labs(x="Sample intervals (s)", y="Reproduction (s)", color = "Model")+
+  theme_new+colorSet5+guides(shape="none")+ theme(legend.position = "none")
+
+RP_log_Exp1
+```
+```{r}
+RP_log_Exp2  <- ggplot(data = m_predY%>%filter(part == 'all', ver == 'log', Exp == 'Exp2', model %in% c('LGM', 'DIM', 'PIM')), aes(x = targetDur, y = m_RP,  group =interaction(range, Exp, model), shape=as.factor('Observation'))) +
+  geom_point(size=1.5, alpha = 0.5)+
+  geom_line(data= m_newY%>%filter(part == 'all', ver == 'log', targetDur < 1.95, targetDur > 0.49, Exp == 'Exp2', model %in% c('LGM', 'DIM', 'PIM')), aes(x=targetDur, y=m_mu_r,  group =interaction(range, Exp, model), color=model)) +
+  geom_abline(slope=1, intercept=0)+
+  facet_wrap(~Exp, nrow = 1) +
+  labs(x="Sample intervals (s)", y="Reproduction (s)", color = "Model")+
+  theme_new+colorSet5+guides(shape="none")+ theme(legend.position = "none")
+
+RP_log_Exp2
+```
+
+
+
+```{r}
+RP_linear  <- ggplot(data = m_predY%>%filter(part == 'all', ver == 'linear', model %in% c('LGM', 'DIM', 'PIM')), aes(x = targetDur, y = m_RP,  group =interaction(range, Exp, model), shape = as.factor('Observation'))) +
+  geom_point(size=1.5, alpha = 0.5)+
+  geom_line(data= m_newY%>%filter(part == 'all', ver == 'linear', model %in% c('LGM', 'DIM', 'PIM')), aes(x=targetDur, y=m_mu_r,  group =interaction(range, Exp, model), color=model)) +
+  geom_abline(slope=1, intercept=0)+
+  facet_wrap(ver~Exp, nrow = 1) +
+  labs(x="Sample intervals (s)", y="Reproduction (s)", shape=" ", color = "Model")+
+  theme_new+colorSet5+guides(shape="none")
+
+ggsave(file.path(figure_path,'figures/pred_RP_linear.png'), RP_linear, width = 9, height = 5)
+
+RP_linear
+```
+
+
+```{r}
+fig_RP <- ggarrange(RP_log, RP_linear, common.legend = TRUE, nrow = 1,ncol = 2, labels = c('a', 'b'))
+ggsave(file.path(figure_path,'pred_RP.png'), fig_RP, width = 9, height = 5)
+fig_RP
+```
+### predicted SD of RP
+
+```{r}
+stdRP_log  <- ggplot(data = m_predY%>%filter(part == 'all', ver == 'log'), aes(x = targetDur, y = sd_RP,  group =interaction(range, Exp, model), shape=as.factor('Observation'))) +
+  geom_point(size=1.5, alpha = 0.5)+
+  geom_line(data= m_newY%>%filter(part == 'all', ver == 'log'), aes(x=targetDur, y=m_sig_r,  group =interaction(range, Exp, model), color=model)) +
+  facet_wrap(ver~Exp, nrow = 1) +
+  labs(x="Durations (s)", y="std of RP", color = "Model")+
+  theme_new+colorSet5+guides(shape="none")
+
+stdRP_log
+```
+
+### predicted CV 
+
+```{r}
+CV_log  <- ggplot(data = m_predY%>%filter(part == 'all', ver == 'log'), aes(x = targetDur, y = cv,  group =interaction(range, Exp, model), shape=as.factor('Observation'))) +
+  geom_point(size=1.5, alpha = 0.5)+
+  geom_line(data= m_newY%>%filter(part == 'all', ver == 'log'), aes(x=targetDur, y=m_sig_r/m_mu_r,  group =interaction(range, Exp, model), color=model)) +
+  geom_abline(slope=1, intercept=0)+
+  facet_wrap(ver~Exp, nrow = 1) +
+  labs(x="Durations (s)", y="CV (s)", color = "Model")+
+  theme_new+colorSet5+guides(shape="none")
+
+ggsave(file.path(figure_path,'figures/pred_CV_log.png'), CV_log, width = 9, height = 5)
+
+CV_log
+```
+
+```{r}
+CV_linear  <- ggplot(data = m_predY%>%filter(part == 'all', ver == 'linear'), aes(x = targetDur, y = cv,  group =interaction(range, Exp, model), shape = as.factor('Observation'))) +
+  geom_point(size=1.5, alpha = 0.5)+
+  geom_line(data= m_newY%>%filter(part == 'all', ver == 'linear'), aes(x=targetDur, y=m_sig_r/m_mu_r,  group =interaction(range, Exp, model), color=model)) +
+  geom_abline(slope=1, intercept=0)+
+  facet_wrap(ver~Exp, nrow = 1) +
+  labs(x="Durations (s)", y="CV", shape=" ", color = "Model")+
+  theme_new+colorSet5+guides(shape="none")
+
+ggsave(file.path(figure_path,'figures/pred_CV_linear.png'), CV_linear, width = 9, height = 5)
+
+CV_linear
+```
+
+
+```{r}
+fig_CV <- ggarrange(CV_log, CV_linear, common.legend = TRUE, nrow = 1,ncol = 2, labels = c('a', 'b'))
+ggsave(file.path(figure_path,'pred_CV.png'), fig_CV, width = 9, height = 5)
+fig_CV
+```
+
+### plot observed and predicted Reproduction Error 
+
+
+```{r}
+fig_mrepError_model_IP <- ggplot(m_predY%>% filter(part =='all', model %in%c("IP", "IP_BR")),
+                              aes(targetDur, 
+                                  m_mu_r-m_RP, 
+                                  group = interaction(range, model), color = model)) + 
+  geom_point()+
+  geom_line(size = .5, aes(color = model, linetype = model))+
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_minimal()+ theme_new + 
+  facet_wrap(ver~Exp, nrow = 1 )+
+  scale_linetype(guide = "none")+
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Reproduction Error (s)',  color='model')+ theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') +colorSet5
+
+fig_mrepError_model_IP
+ggsave(file.path(figure_path,'fig_mrepError_model_IP.png'), fig_mrepError_model_IP, width = 7, height = 4)
+```
+```{r}
+fig_mrepError_model_all <- ggplot(m_predY%>% filter(part =='all', model %in%c("DIM","LGM", "PIM")),
+                              aes(targetDur, 
+                                  m_mu_r-m_RP, m_mu_r-m_RP, 
+                                  group = interaction(range, model), color = model)) + 
+  geom_point(position = position_dodge(width = 0.05))+
+  geom_line(size = .5, aes(color = model, linetype = model), position = position_dodge(width = 0.05) )+
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_minimal()+ theme_new + 
+  facet_wrap(ver~Exp, nrow = 1 )+
+  scale_linetype(guide = "none")+
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Reproduction Error (s)',  color='model')+ theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') +colorSet5
+
+fig_mrepError_model_all
+ggsave(file.path(figure_path,'fig_mrepError_model_all.png'), fig_mrepError_model_all, width = 7, height = 4)
+```
+
+
+```{r}
+fig_mrepError_model <- ggplot(m_predY%>% filter(part =='all', ver == 'log', model %in%c("DIM","LGM", "PIM")),
+                              aes(targetDur, 
+                                  m_mu_r-m_RP, m_mu_r-m_RP, 
+                                  group = interaction(range, model), color = model)) + 
+  geom_point(position = position_dodge(width = 0.05))+
+  geom_line(size = .5, aes(color = model, linetype = model),  position = position_dodge(width = 0.05) )+
+  geom_hline(yintercept= 0, linetype = 2) +
+  theme_minimal()+ theme_new + 
+  facet_wrap(~Exp)+
+  scale_linetype(guide = "none")+
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Prediction error (s)',  color='model')+ theme(legend.position='bottom')+
+  scale_x_continuous(trans='log10') +colorSet5
+
+fig_mrepError_model
+```
+
+```{r}
+#LGM and PIM are overlopped
+plt_rErrorScatter = ggplot(data = predY_err_new%>%filter(part =="all", ver=='log', model %in%c("DIM","LGM", "PIM")), aes(mm_pred_NBIAS, mm_pred_Var_NBIAS, color = model)) +  
+  geom_point(alpha = .5, size = 4, position = position_dodge(width = 0.001))+
+  geom_errorbar(aes(ymin = mm_pred_Var_NBIAS-se_pred_Var, ymax = mm_pred_Var_NBIAS+se_pred_Var), width = .005, position = position_dodge(width = 0.001))+
+  geom_errorbarh(aes(xmin= mm_pred_NBIAS-se_pred_RP_BIAS, xmax = mm_pred_NBIAS+se_pred_RP_BIAS), height = .01, position = position_dodge(width = 0.001))+
+  geom_point(m_predY_sub_new%>%filter(part =="all", ver=='log', model %in%c("DIM","LGM", "PIM")), mapping = aes(abs(mm_pred_NBIAS), abs(mm_pred_Var_BIAS), color = model), alpha = .9, position = position_dodge(width = 0.001)) +  
+  facet_wrap(~Exp) +colorSet3+
+  xlab('prediction error on reprodution mean')+  
+  ylab('prediction error on variance')+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+plt_rErrorScatter
+```
+```{r}
+plt_rErrorScatter_all = ggplot(data = predY_err_new%>%filter(part =="all", model %in%c("DIM","LGM", "PIM")), aes(mm_pred_NBIAS, mm_pred_Var_NBIAS, color = model)) +  
+  geom_point(alpha = .5, size = 4, aes(shape = ver), position = position_dodge(width = 0.001))+
+  geom_errorbar(aes(ymin = mm_pred_Var_NBIAS-se_pred_Var, ymax = mm_pred_Var_NBIAS+se_pred_Var), width = .005, position = position_dodge(width = 0.001))+
+  geom_errorbarh(aes(xmin= mm_pred_NBIAS-se_pred_RP_BIAS, xmax = mm_pred_NBIAS+se_pred_RP_BIAS), height = .01, position = position_dodge(width = 0.001))+
+  geom_point(m_predY_sub_new%>%filter(part =="all", ver=='log', model %in%c("DIM","LGM", "PIM")), mapping = aes(abs(mm_pred_NBIAS), abs(mm_pred_Var_BIAS), color = model, shape = ver), alpha = .9, position = position_dodge(width = 0.001)) +  
+  facet_wrap(~Exp) +colorSet3+
+  xlab('prediction error of reproduction mean')+  
+  ylab('prediction error of reproduction variance')+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+plt_rErrorScatter_all
+```
+
+```{r}
+plt_rErrorScatter_all1 = ggplot(data = predY_err_new%>%filter(part =="all", model %in%c("DIM","LGM", "PIM")), aes(100*mm_pred_NBIAS/mm_m_RP, 100*mm_pred_Var_NBIAS/mm_sd_RP, color = model)) +  
+  geom_point(alpha = .5, size = 5, aes(shape = ver))+
+  geom_errorbar(aes(ymin = 100*(mm_pred_Var_NBIAS-se_pred_Var)/mm_sd_RP, ymax = 100*(mm_pred_Var_NBIAS+se_pred_Var)/mm_sd_RP), width = .2)+
+  geom_errorbarh(aes(xmin= 100*(mm_pred_NBIAS-se_pred_RP_BIAS)/mm_m_RP, xmax = 100*(mm_pred_NBIAS+se_pred_RP_BIAS)/mm_m_RP), height = 2)+
+  facet_wrap(~Exp) +colorSet5+
+  xlab('MAPE of Reproduction mean(%)')+ 
+  ylab('MAPE of Reproduction variance(%)')+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+plt_rErrorScatter_all1
+```
+
+```{r}
+plt_rErrorScatter3 = ggplot(data = predY_err_new%>%filter(part =="all",ver=='log', model %in%c("DIM","LGM","PIM")), aes(100*mm_pred_NBIAS/mm_m_RP, 100*mm_pred_Var_NBIAS/mm_sd_RP, color = model)) +  
+  geom_point(alpha = .5, size = 5, position = position_dodge(width = 0.2))+
+  geom_errorbar(aes(ymin = 100*(mm_pred_Var_NBIAS-se_pred_Var)/mm_sd_RP, ymax = 100*(mm_pred_Var_NBIAS+se_pred_Var)/mm_sd_RP), width = .2,  position = position_dodge(width = 0.2))+
+  geom_errorbarh(aes(xmin= 100*(mm_pred_NBIAS-se_pred_RP_BIAS)/mm_m_RP, xmax = 100*(mm_pred_NBIAS+se_pred_RP_BIAS)/mm_m_RP), height = 2,   position = position_dodge(width = 0.2))+  
+  geom_point(data = m_predY_sub_new%>%filter(part =="all", ver=='log', model %in%c("DIM","LGM", "PIM")), mapping = aes(100* abs(mm_pred_NBIAS/mm_m_RP), 100*abs(mm_pred_Var_BIAS/mm_sd_RP), color = model), alpha = .9) +  
+  facet_wrap(~Exp) +colorSet4+
+  xlab('MAPE of reproduction mean (%)')+ 
+  ylab('MAPE of reproduction variance (%)')+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+plt_rErrorScatter3
+```
+```{r}
+library("cowplot")
+fig_ModelRlt2 <- ggdraw() +
+  draw_plot(RP_log_Exp1, x = 0, y = .5, width = .5, height = .5) + 
+  draw_plot(RP_log_Exp2, x = .5, y = .5, width = .5, height = .5) +
+  draw_plot(plt_rErrorScatter + theme(legend.position = "bottom") , x = 0, y = 0, width = 1, height = 0.5) +
+  draw_plot_label(label = c("A", "B", "C"), size = 15,
+                  x = c(0, 0.5, 0), y = c(1, 1, 0.5))
+ggsave(file.path(figure_path,'fig_ModelRlt2.png'), fig_ModelRlt2, width = 7, height = 7)
+fig_ModelRlt2
+```
+
+
+```{r}
+#plt_rErrorScatter
+fig_ModelRlt <- ggarrange(fig_mrepError_model, plt_rErrorScatter3, common.legend = TRUE, nrow = 2, ncol = 1, labels = c('a', 'b'))
+ggsave(file.path(figure_path,'fig_ModelRlt.png'), fig_ModelRlt, width = 8, height = 7)
+fig_ModelRlt
+```
+
+```{r}
+fig_ModelRlt_all <- ggarrange(fig_mrepError_model_all, plt_rErrorScatter_all, common.legend = TRUE, nrow = 2, ncol = 1, labels = c('a', 'b'))
+ggsave(file.path(figure_path,'fig_ModelRlt_all.png'), fig_ModelRlt_all, width = 7, height = 7)
+fig_ModelRlt_all
+```
+
+
+
+#  WAIC and LOO-CV
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+# merge the waic of IP_BP model
+waic_colnames = c("looic", "waic", "Exp", "model", "ver", "part")
+baseline_BR_Bayparlist$part = 'all'
+baseline_BR_Bayparlist$model = 'IP_BR'
+waic_list = rbind(m_Baypar%>%select(waic_colnames), baseline_BR_Bayparlist%>%select(waic_colnames) )
+m_WAIC <- dplyr::group_by(waic_list, Exp, model, ver, part) %>%
+  dplyr::summarize(m_looic = mean(looic),
+                   m_waic = mean(waic),
+                   n = n(),
+                   se_waic = sd(waic)/sqrt(n-1),
+                   se_looic = sd(looic)/sqrt(n-1)) 
+m_WAIC
+```
+
+
+```{r}
+m_WAIC%>%filter(ver == 'log', part == 'all', model %in% c('LGM', 'DIM', 'PIM')) %>%select("Exp", "model", "m_waic" , "m_looic")
+```
+
+
+```{r}
+plt_waic <- ggplot(m_WAIC %>% filter(part == 'all', model %in% c("DIM","LGM", "PIM")), aes(model, m_waic, ymin = m_waic - se_waic, ymax = m_waic + se_waic, group = Exp, color = Exp, shape = model))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  labs(x = " ", y = "Mean WAIC") +
+  theme_minimal()+ theme_new + facet_wrap(~ver)+
+  scale_color_manual(values = mycolors)
+
+plt_waic
+ggsave(file.path(figure_path,'plt_waic.png'), plt_waic, width = 6, height = 4)
+```
+```{r}
+plt_waic <- ggplot(m_WAIC %>% filter(part == 'all', model %in%c("DIM","LGM", "PIM")), aes(model, m_waic, ymin = m_waic - se_waic, ymax = m_waic + se_waic, group = interaction(Exp, ver), color = interaction(Exp, ver)))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.5,  position = position_dodge(width = 0.2)) +
+  labs(x = " ", y = "Mean WAIC", color = "") +
+  theme_minimal()+ theme_new+ colorSet4
+
+plt_waic
+```
+
+```{r}
+plt_waic_all <- ggplot(m_WAIC %>% filter(part == 'all'), aes(model, m_waic, ymin = m_waic - se_waic, ymax = m_waic + se_waic, group = interaction(Exp, ver), color = interaction(Exp, ver)))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.5,  position = position_dodge(width = 0.2)) +
+  labs(x = " ", y = "Mean WAIC", color = "") +
+  theme_minimal()+ theme_new+ colorSet4
+
+plt_waic_all
+```
+
+
+```{r}
+plt_looic <- ggplot(m_WAIC %>% filter(part == 'all', model %in%c("DIM","LGM", "PIM")), aes(model, m_looic, ymin = m_looic - se_looic, ymax = m_looic + se_looic, group = interaction(Exp, ver), color = interaction(Exp, ver)))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.5,  position = position_dodge(width = 0.2)) +
+  labs(x = " ", y = "Mean LOOIC", color ="") +
+  theme_minimal()+ theme_new + colorSet4
+
+plt_looic
+```
+
+
+```{r}
+library(ggpubr)
+fig_waic_looic<- ggarrange(plt_waic, plt_looic, common.legend = TRUE, nrow = 1, labels = c('a', 'b'))
+
+ggsave(file.path(figure_path,'fig_waic_looic.png'), fig_waic_looic, width = 7, height = 4)
+fig_waic_looic
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

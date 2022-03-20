@@ -1,0 +1,21 @@
+"0","library(reshape2)"
+"0","library(latex2exp)"
+"0","library(rlist)"
+"0","library(bayesplot)"
+"2","This is bayesplot version 1.8.1
+"
+"2","- Online documentation and vignettes at mc-stan.org/bayesplot
+"
+"2","- bayesplot theme set to bayesplot::theme_default()
+"
+"2","   * Does _not_ affect other ggplot2 plots
+"
+"2","   * See ?bayesplot_theme_set for details on theme setting
+"
+"0","source('ana_functions.R') "
+"0","source('mytheme.R') "
+"0","modellist <- c('LGM','DIM', 'PIM', 'IP')# IP #'BPM' #'Baseline' "
+"0","logVersion = 'log'"
+"0","rstanmodelPath = 'RSTANMODELS'"
+"0","modelPath = paste0('RSTANMODELS/models/', logVersion)"
+"0","AllExpData <- read.csv(paste0(""data/AllExpData_valid.csv""))"

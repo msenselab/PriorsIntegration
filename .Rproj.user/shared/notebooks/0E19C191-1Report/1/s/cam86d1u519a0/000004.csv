@@ -1,0 +1,5 @@
+"0","### calculate indifference points (average)"
+"0","mslope_pr = getmSlope(exps, gp_var_pr)  # averaged slopes and InP across subjects after removing outliers"
+"1","`summarise()` has grouped output by 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"0","head(mslope_pr)"

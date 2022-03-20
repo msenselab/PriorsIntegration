@@ -1,0 +1,11 @@
+"0","mslope_group = slope_group %>%"
+"0","    group_by(Exp, group) %>% "
+"0","    dplyr::summarise(m_slope = mean(slope),"
+"0","                     m_CI = mean(CI),"
+"0","                     m_minRP = mean(minRP),"
+"0","                     m_inP = mean(inP),"
+"0","                     n = n(), "
+"0","                     se_slope = sd(slope)/ sqrt(n-1),"
+"0","                     se_CI = sd(CI)/sqrt(n-1))"
+"1","`summarise()` has grouped output by 'Exp'. You can override using the `.groups` argument.
+"

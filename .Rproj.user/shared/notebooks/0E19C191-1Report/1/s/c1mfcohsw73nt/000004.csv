@@ -1,0 +1,7 @@
+"0","fitMeanRP <- sumexp %>% group_by(Exp, priortype, range) %>%"
+"0","  dplyr::summarise(minDur = min(targetDur),"
+"0","                   maxDur= max(targetDur))"
+"1","`summarise()` has grouped output by 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"0","mCI <- left_join(mCI, fitMeanRP, by = c(""Exp"", ""priortype"", ""range""))"
+"0","mCI"

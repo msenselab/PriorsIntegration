@@ -1,0 +1,16 @@
+"0","write_csv(dplyr::group_by(sumexp1Sub%>% filter(priortype =='IR'), targetDur, NSub) %>%"
+"0","  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_IR1.csv'))"
+"1","`summarise()` has grouped output by 'targetDur'. You can override using the `.groups` argument.
+"
+"0","write_csv(dplyr::group_by(sumexp1Sub%>% filter(priortype =='BR'), targetDur, NSub) %>%"
+"0","  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_BR1.csv'))"
+"1","`summarise()` has grouped output by 'targetDur'. You can override using the `.groups` argument.
+"
+"0","write_csv(dplyr::group_by(sumexp2Sub%>% filter(priortype =='IR'), targetDur, NSub) %>%"
+"0","  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_IR2.csv'))"
+"1","`summarise()` has grouped output by 'targetDur'. You can override using the `.groups` argument.
+"
+"0","write_csv(dplyr::group_by(sumexp2Sub%>% filter(priortype =='BR'), targetDur, NSub) %>%"
+"0","  dplyr::summarize(m_m_err = mean(m_err))%>%spread(targetDur, m_m_err), file = paste0('generated/lm_err_dur_BR2.csv'))"
+"1","`summarise()` has grouped output by 'targetDur'. You can override using the `.groups` argument.
+"

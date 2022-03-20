@@ -1,0 +1,4 @@
+"0","bf_priortype <- bf[3]/bf[2]"
+"0","bf_range <- bf[3]/bf[1]"
+"0","#Prior type * ragne interaction "
+"0","bf_int <- bf[4]/bf[3] "

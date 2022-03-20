@@ -1,0 +1,22 @@
+"0","m_predY <- m_predY_sub %>%
+  dplyr::group_by(Exp, targetDur, model) %>% 
+  dplyr::summarize(n = n(),
+                   m_m_repDur = mean(m_repDur),
+                   se_m_repDur = sd(m_repDur) /sqrt(n-1),
+                   m_sd_repDur = mean(sd_repDur), 
+                   m_m_sig_r =mean(m_sig_r),
+                   se_sig_r = sd(m_sig_r)/sqrt(n-1),
+                   m_m_mu_r = mean(m_mu_r),
+                   cv = mean(cv),
+                   pred_cv = mean(pred_cv),
+                   mpredRP_err = mean(predRP_err),
+                   mpredVar_err = mean(predVar_err),
+                   mpredRP_rerr = mean(predRP_rerr),
+                   mpredVar_rerr = mean(predVar_rerr), 
+                   mpredcv_err = mean(predcv_err),
+                   mpredcv_rerr = mean(predcv_rerr))
+"
+"2","Error: Must group by variables found in `.data`.
+* Column `targetDur` is not found.
+[90mRun `rlang::last_error()` to see where the error occurred.[39m
+"

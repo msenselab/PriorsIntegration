@@ -1,0 +1,12 @@
+"0","predY_err_new <- m_predY_sub %>%dplyr::group_by(Exp, model, priortype) %>%"
+"0","  dplyr::summarize(n= n(),"
+"0","                   mm_m_RP = mean(m_m_RP),"
+"0","                   mm_sd_RP = mean(m_sd_RP),"
+"0","                   mm_pred_Var = mean(mm_sig_r- m_sd_RP),"
+"0","                   mm_pred_Var_NBIAS = mean(abs(mm_sig_r- m_sd_RP)),"
+"0","                   se_prederr = sd(m_m_prederr)/sqrt(n-1),"
+"0","                   se_pred_Var = sd(mm_sig_r- m_sd_RP)/sqrt(n-1), "
+"0","                   m_m_prederr = mean(m_m_prederr),"
+"0","                   m_m_pred_NBIAS = mean(abs(m_m_prederr)))"
+"1","`summarise()` has grouped output by 'Exp', 'model'. You can override using the `.groups` argument.
+"

@@ -1,0 +1,10 @@
+"0","slope_group = exps%>% dplyr::group_by(NSub, Exp, group) %>% nest()  %>% "
+"0","    mutate(model = map(data, mRep_model)) %>%  # linear regression"
+"0","    mutate(slope = map(model, broom::tidy)) %>%  # get estimates"
+"0","    unnest(slope, .drop = TRUE) %>% # remove raw data"
+"0","    select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns"
+"0","    spread(term, estimate) %>%   # spread stimates"
+"0","    dplyr::rename(minRP = `(Intercept)`, slope = targetDur)  # rename columns"
+"2","Error in select(., -std.error, -statistic, -p.value) : 
+  unused arguments (-std.error, -statistic, -p.value)
+"

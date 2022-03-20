@@ -1,0 +1,23 @@
+"0","predY <- group_by(All_predY, targetDur, Exp, NSub, model, priortype, range) %>%"
+"0","  dplyr::summarize(m_RP = mean(RP), "
+"0","                   m_RP_BIAS = mean(RP_BIAS),"
+"0","                   m_predBIAS = mean(predBIAS),"
+"0","                   m_predNBIAS = mean(abs(predBIAS)),"
+"0","                   m_prederr = mean(prederr),"
+"0","                   n = n(), "
+"0","                   sd_RP = sd(RP),"
+"0","                   cv_observed = sd_RP/m_RP,"
+"0","                   se_RP = sd_RP/ sqrt(n-1),"
+"0","                   m_mu_r = mean(mu_r),"
+"0","                   m_sig_r = mean(sig_r), # sd of prediction"
+"0","                   cv_Pred = m_sig_r/m_mu_r)"
+"1","`summarise()` has grouped output by 'targetDur', 'Exp', 'NSub', 'model', 'priortype'. You can override using the `.groups` argument.
+"
+"0","gp_var <- c('targetDur', 'Exp', 'model', 'priortype', 'range')"
+"0","m_predY <- summarizePredY(predY, gp_var)"
+"1","`summarise()` has grouped output by 'targetDur', 'Exp', 'model', 'priortype'. You can override using the `.groups` argument.
+"
+"0","gp_var_sub <- c('NSub', 'Exp', 'model', 'priortype', 'range')"
+"0","m_predY_sub <- summarizePredY(predY, gp_var_sub)"
+"1","`summarise()` has grouped output by 'NSub', 'Exp', 'model', 'priortype'. You can override using the `.groups` argument.
+"

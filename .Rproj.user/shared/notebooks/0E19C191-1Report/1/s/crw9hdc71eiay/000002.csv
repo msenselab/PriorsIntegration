@@ -1,0 +1,4 @@
+"0","mslope_group = left_join(mslope_group, Exp_dist, by = c(""Exp"", ""group"") )"
+"0","mslope_group$n.x = NULL"
+"0","mslope_group$n.y = NULL"
+"0","mslope_group_melt <- reshape2::melt(mslope_group%>% select(Exp, group, m_inP, mDur, sd_Dur, gm_Dur), id.vars = c(""Exp"", ""group""), variables.name = ""type"", value.name =  ""value"")"

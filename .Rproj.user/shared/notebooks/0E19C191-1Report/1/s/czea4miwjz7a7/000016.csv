@@ -1,0 +1,5 @@
+"0","fig_CV<- ggarrange(fig_NBIAS_CV_sub,  fig_NBIAS_CV_pr, common.legend = TRUE, legend = ""bottom"", ncol = 2, nrow =1)"
+"2","Warning:"
+"2"," Removed 3 rows containing missing values (geom_point).
+"
+"0","ggsave(file.path('figures', '/figures/fig_CV.png'), fig_CV, width = 7, height = 8)"

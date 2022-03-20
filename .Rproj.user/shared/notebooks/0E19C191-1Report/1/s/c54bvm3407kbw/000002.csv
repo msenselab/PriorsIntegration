@@ -1,0 +1,6 @@
+"0","temp_mCI = mCI%>% select(Exp, priortype, range, m_InP, se_InP)"
+"0","temp_Exp_dist = Exp_dist %>%filter(group %in% c('short', 'long'))"
+"0","temp_Exp_dist$range = temp_Exp_dist$group"
+"0","temp_Exp_dist$group = NULL"
+"0","temp_Exp_dist$n = NULL"
+"0","temp_mCI = left_join(temp_mCI, temp_Exp_dist,  by =c(""Exp"", ""range""))"

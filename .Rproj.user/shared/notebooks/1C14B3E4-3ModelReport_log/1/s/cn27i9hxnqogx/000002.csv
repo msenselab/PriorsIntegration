@@ -1,0 +1,9 @@
+"0","# observed data"
+"0","exps <- read.csv(paste0(getwd(), '/data/AllExpData_valid.csv'))"
+"0","gp_var_prior= c(""NSub"", ""targetDur"", ""Exp"", ""priortype"", ""range"")"
+"0","sumexp <- summarizeMeanData(exps, gp_var_prior)"
+"1","`summarise()` has grouped output by 'NSub', 'targetDur', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"1","`summarise()` has grouped output by 'targetDur', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"0","sumexp$model = as.factor('measured')"

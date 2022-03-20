@@ -1,0 +1,7 @@
+"0","#define the extension"
+"0","mCI$extension1_start = mCI$maxDur"
+"0","mCI$extension1_end = mCI$maxDur"
+"0","mCI$extension2_start = mCI$minDur"
+"0","mCI$extension2_end = mCI$minDur"
+"0","mCI[which(mCI$range  == ""short"" & mCI$priortype == ""IR""),""extension1_end""] = 1.15"
+"0","mCI[which(mCI$range  == ""long""& mCI$priortype == ""IR""),""extension2_start""] = 0.8"

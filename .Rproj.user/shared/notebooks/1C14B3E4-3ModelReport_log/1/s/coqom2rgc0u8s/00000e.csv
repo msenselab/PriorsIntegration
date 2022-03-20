@@ -1,0 +1,4 @@
+"0","library(ggpubr)"
+"0","fig_waic_looic<- ggarrange(plt_waic, plt_looic, common.legend = TRUE, legend = ""bottom"")"
+"0",""
+"0","ggsave(paste0(getwd(), '/', modelPath, '/figures/fig_waic_looic.png'), fig_waic_looic, width = 7, height = 4)"

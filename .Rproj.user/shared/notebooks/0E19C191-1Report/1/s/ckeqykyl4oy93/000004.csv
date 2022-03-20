@@ -1,0 +1,32 @@
+"0","fig_mdur_mIP_gr <- ggplot(data = temp_mCI_gr, aes(mDur, m_InP, color = group, shape= Exp))+"
+"0","  geom_point(size = 2)+"
+"0","  geom_line(aes(group = Exp)) +"
+"0","  geom_errorbar(aes(ymin=m_InP-se_InP, ymax=m_InP+se_InP, color = group)) + "
+"0","  geom_hline(yintercept=0.9798, linetype = 1) + "
+"0","  geom_text(x=0.75, y=1.21, label=""GM = 0.9798"", show.legend = FALSE)+"
+"0","  #geom_hline(yintercept=1.11 , linetype = 1) + "
+"0","  #geom_text(x=0.75, y=1.07, label=""Grand mean = 1.11 in Exp.2"", show.legend = FALSE)+"
+"0","  geom_abline(slope = 1, linetype = 2) + # add diagonal line+"
+"0","  scale_color_manual(values = mycolors3) +"
+"0","  theme_new +"
+"0","  labs(x = 'range mean duration', y = 'Indifference point (s)', size =5)+"
+"0","  ylim(0.5,2)+xlim(0.5,2)"
+"0",""
+"0","fig_mdur_mIP_gr"
+"2","Warning in min(x) :"
+"2"," no non-missing arguments to min; returning Inf
+"
+"2","Warning in max(x) :"
+"2"," no non-missing arguments to max; returning -Inf
+"
+"2","Warning in min(diff(sort(x))) :"
+"2","
+ "
+"2"," no non-missing arguments to min; returning Inf
+"
+"2","Warning:"
+"2"," Removed 6 rows containing missing values (geom_point).
+"
+"2","Warning:"
+"2"," Removed 6 row(s) containing missing values (geom_path).
+"

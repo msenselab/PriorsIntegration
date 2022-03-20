@@ -1,0 +1,6 @@
+"0","# get the slopes and indifference points for each subject"
+"0","gp_var_pr = c('NSub', 'Exp', 'priortype', 'range')"
+"0","slope_pr = getSlope(exps, gp_var_pr)"
+"0","slope_pr$CI= 1-slope_pr$slope"
+"0","# # display the outliers according to indifference points"
+"0","# slope_pr%>% filter(inPOutlier == TRUE)"

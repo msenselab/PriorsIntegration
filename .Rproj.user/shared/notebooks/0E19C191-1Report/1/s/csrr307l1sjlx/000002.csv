@@ -1,0 +1,11 @@
+"0","# load valid data"
+"0","exps <- readAllData(paste0(getwd(), '/data/AllExpData.csv'), TRUE, TRUE)"
+"1","`summarise()` has grouped output by 'Exp', 'targetDur', 'range'. You can override using the `.groups` argument.
+"
+"1","`summarise()` has grouped output by 'NSub', 'Exp', 'targetDur', 'range'. You can override using the `.groups` argument.
+"
+"0","exps$BIAS = abs(exps$repError)"
+"0","exps$rerr = exps$repError/exps$targetDur"
+"0","exps$Exp = as.factor(exps$Exp)"
+"0","exps$NSub = as.factor(exps$NSub)"
+"0","write.csv(exps, file = paste0(getwd(), ""/data/AllExpData_valid.csv""))"

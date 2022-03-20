@@ -1,0 +1,5 @@
+"0","source('ana_functions.R')"
+"0","library(BayesFactor)"
+"0","library('ggridges')"
+"0","#customize theme"
+"0","source('mytheme.R') "

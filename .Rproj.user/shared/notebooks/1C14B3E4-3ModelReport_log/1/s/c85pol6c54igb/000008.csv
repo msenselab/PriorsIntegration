@@ -1,0 +1,8 @@
+"0","mmm_predY <- m_predY_sub %>% dplyr::group_by(Exp, model, priortype) %>%"
+"0","  dplyr::summarize("
+"0","    mm_cv_observed = mean(m_cv_observed),"
+"0","    mm_cv_Pred = mean(m_cv_Pred), n = n())"
+"1","`summarise()` has grouped output by 'Exp', 'model'. You can override using the `.groups` argument.
+"
+"0","mmm_predY$acc_predCV = mmm_predY$mm_cv_Pred /mmm_predY$mm_cv_observed"
+"0","mmm_predY"

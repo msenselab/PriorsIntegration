@@ -1,0 +1,3 @@
+"0","mslope_pr$range <- factor(mslope_pr$range, levels = c(""short"", ""long""))"
+"0","mslope_pr <-mslope_pr[order(mslope_pr$range),]"
+"0","mslope_pr"

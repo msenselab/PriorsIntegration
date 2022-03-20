@@ -1,0 +1,22 @@
+"0","gp_var_prior= c(""NSub"", ""targetDur"", ""Exp"", ""priortype"", ""range"")"
+"0","sumexpSub <-summarizedata(exps, gp_var_prior)"
+"1","`summarise()` has grouped output by 'NSub', 'targetDur', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"0","##separate data set "
+"0","sumexp <- summarizeMeanData(exps, gp_var_prior)"
+"1","`summarise()` has grouped output by 'NSub', 'targetDur', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"1","`summarise()` has grouped output by 'targetDur', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"0","m_sumexp <-  mm_summarizedata(exps, gp_var_prior)"
+"1","`summarise()` has grouped output by 'NSub', 'targetDur', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"1","`summarise()` has grouped output by 'targetDur', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"1","`summarise()` has grouped output by 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"0","m_exp_sub <- summarizeMeanData(exps, c(""targetDur"",""NSub"", ""Exp"", ""priortype"", ""range""))"
+"1","`summarise()` has grouped output by 'targetDur', 'NSub', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"
+"1","`summarise()` has grouped output by 'NSub', 'Exp', 'priortype'. You can override using the `.groups` argument.
+"

@@ -1,0 +1,4 @@
+"0","#fig.mCI.bar.exp1  fig.mCI.bar.exp2"
+"0","fig_CI <- ggpubr::ggarrange(fig.mCI.bar.exp1, fig.mCI.bar.exp2, common.legend = TRUE, legend = 'bottom', labels = c('a', 'b'), ncol =2, nrow =1, widths = c(4,4))"
+"0",""
+"0","ggsave(file.path('figures','fig_CI.png'), fig_CI, width = 8, height = 4)"

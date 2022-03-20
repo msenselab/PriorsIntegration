@@ -1,0 +1,1 @@
+"0","mm_slope_pr <- getmmSlope(sumexp, gp_var_pr[2:length(gp_var_pr)])"

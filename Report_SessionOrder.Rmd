@@ -1,0 +1,333 @@
+---
+title: "statistical results on behavioural data (order of session) "
+author: "Fiona Zhu"
+date: "10/27/2020"
+output:
+pdf_document: default
+html_document:
+number_sections: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source('ana_functions.R')
+library(BayesFactor)
+```
+
+```{r include=FALSE}
+#customize theme
+source('mytheme.R') 
+```
+
+
+# Introduction
+To estimate mean priors from the separate interval groups (the short and long ranges, and mixed ranges. we adopted the left and right spatial separation for the short and long ranges, as used in Roach et al. (2017).
+
+![Procedure](images/timeline.png){width=60%}
+
+# subject information
+
+```{r}
+SubInfo = read.csv(paste0(getwd(), '/data/AllExpSubInfo.csv'))
+SummarySubInfo<- SubInfo %>% group_by(Exp) %>%
+  dplyr::summarise(mean_Age = mean(Age),
+                   n = n(),
+                   sd_Age = sd(Age))
+SummarySubInfo
+```
+
+```{r}
+F_subInfo <- SubInfo %>% dplyr::filter(Gender == 'F')
+SummarySubInfo_F<- F_subInfo %>%
+  dplyr::group_by(Exp) %>%
+  dplyr::summarise(mean_Age = mean(Age),
+                   n = n(),
+                   sd_Age = sd(Age))
+SummarySubInfo_F
+```
+
+
+# load the experiment data
+
+```{r message=FALSE, warning=FALSE}
+# load all data
+allexpdat <- readAllData(paste0(getwd(), '/data/AllExpData.csv'), FALSE, FALSE)
+allexpdat$targetDur  <-  round(allexpdat$targetDur,3) 
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+# load valid data
+exps <- readAllData(paste0(getwd(), '/data/AllExpData.csv'), TRUE, TRUE)
+exps$BIAS = abs(exps$repError)
+exps$rerr = exps$repError/exps$targetDur
+exps$Exp = as.factor(exps$Exp)
+exps$NSub = as.factor(exps$NSub)
+```
+
+
+## Experiment 1 ('gp_loc.m')
+
+In exp1, the target intervals are the ramdomly selected elements from three groups of time intervals: group short (400-800ms), group long (1200-1600ms), and a mixed group(400-800ms, 1200-1600ms). 
+
+The experiment consisted of three sessions with each had 160 trials.
+The time intervals in short group are 400, 475.7, 565.7, 672.7, 800ms.  The time intervals in long group are 1.2, 1.4, 1.9, 2.02, and 2.4s. The short and long ranges were separated by 400 ms. The order between short group and long group was counterbalanced across participants. The mixed group is always the last session.
+
+In exp1, there are one practice block and 24 formal blocks. Each block has 20 trials. The duration of the circle displayed on the screen is the interval that participants need to replicate. By pressing left button (Mouse) to reproduce the time duration as long as stimulus was presented. Participants received feedback after their response.
+
+
+
+## Experiment 2 (‘gp_loc_ss.m’)
+
+In this experiment, the short and long ranges were clearly separate. The experiment consisted of three sessions with each had 160 trials. The time intervals used in Exp.2 in short group were chosen from 491.2, 542.9, 600, 663, 732.8 ms, and target intervals in long group were chosen from 1.31, 1.45, 1.60, 1.77 and 1.954s. The short (491.2-732.8ms) and long (1310-1954ms) ranges were separated by 577 ms. The order between short group and long group was counterbalanced across participants. The mixed group is always the last session.
+
+In exp2, there are one practice block and 16 formal blocks. Each block has 30 trials. The duration of the circle displayed on the screen is the interval that participants need to replicate. By pressing left button (Mouse) to reproduce the time duration as long as stimulus was presented. Participants received feedback after their response.
+
+
+```{r}
+# set the previous session
+levels(exps$firstSession) = c('S-L-M', 'L-S-M')
+```
+
+### analysis on previous session (short/long group)
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+gp_var_prior= c("NSub", "targetDur", "firstSession", "Exp", "range")
+sumexpSub <-summarizedata(exps, gp_var_prior)
+##separate data set 
+sumexp <- summarizeMeanData(exps, gp_var_prior)
+```
+
+we plot mean reproduction of Experiment 1 and 2 to check the differnece between different session orders.
+```{r}
+fig_mRP_preSession <- ggplot(sumexp,
+       aes(targetDur, m_m_RP, group = interaction(range, firstSession), color = firstSession)) + 
+  geom_point(size = 0.5) + 
+  geom_line(data = sumexp) + 
+  geom_errorbar(aes(ymin = m_m_RP- m_se_err , ymax = m_m_RP + m_se_err), width = 0.02) + 
+  geom_abline(slope = 1, linetype=3, size =0.2) + # add diagonal line
+  facet_wrap(~Exp) +
+  theme_new + scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Mean Reproductions (s)', color='previous session')+ theme(legend.position='bottom')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+ggsave(file.path('figures','fig_mRP_preSession.png'), fig_mRP_preSession, width = 7, height = 5)
+
+fig_mRP_preSession
+```
+
+
+### order of experiment session (short/long group)
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+gp_var_prior= c("NSub", "targetDur", "firstSession", "Exp", "priortype", "range")
+sumexpSub <-summarizedata(exps, gp_var_prior)
+##separate data set 
+sumexp <- summarizeMeanData(exps, gp_var_prior)
+m_sumexp <-  mm_summarizedata(exps, gp_var_prior)
+
+```
+
+we plot mean reproduction of Experiment 1 and 2 to check the differnece between different session orders.
+```{r}
+fig_mRP_Exp1 <- ggplot(sumexp %>% filter(Exp == 'Exp1'),
+       aes(targetDur, m_m_RP, group = interaction(priortype, range, firstSession), color = firstSession)) + 
+  geom_point(size = 0.5) + 
+  geom_line()+
+  geom_errorbar(aes(ymin = m_m_RP- m_se_err , ymax = m_m_RP + m_se_err), width = 0.02) + 
+  geom_abline(slope = 1, linetype=3, size =0.2) + # add diagonal line
+  facet_wrap(~priortype) +
+  theme_new + scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Mean Reproductions (s)', color='first session')+ theme(legend.position='bottom')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRP_Exp1
+```
+
+```{r}
+fig_mRP_Exp2 <- ggplot(sumexp %>% filter(Exp == 'Exp2'),
+       aes(targetDur, m_m_RP, group = interaction(priortype, range, firstSession), color = firstSession)) + 
+  geom_point(size = 0.5) + 
+  geom_line()+
+  geom_errorbar(aes(ymin = m_m_RP- m_se_err , ymax = m_m_RP + m_se_err), width = 0.02) + 
+  geom_abline(slope = 1, linetype=3, size =0.2) + # add diagonal line
+  facet_wrap(~priortype) +
+  theme_new + scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Mean Reproductions (s)', color='first session')+ theme(legend.position='bottom')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRP_Exp2
+```
+
+
+```{r}
+fig_mRP_short <- ggplot(sumexp %>% filter(range == 'short'),
+       aes(targetDur, m_m_RP, group = interaction(priortype, firstSession), color = firstSession, shape = priortype)) + 
+  geom_point(size = 2, position = position_dodge(width = 0.02)) + 
+  geom_line(aes(linetype = priortype), position = position_dodge(width = 0.02))+
+  #geom_errorbar(aes(ymin = m_m_RP- m_se_err , ymax = m_m_RP + m_se_err), width = 0.02, position = position_dodge(width = 0.02)) + 
+  geom_abline(slope = 1, linetype=3, size =0.2) + # add diagonal line
+  facet_wrap(range~Exp) +
+  theme_new + scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Mean reproductions (s)', color='Session order', shape = 'Condition', linetype ='Condition')+ theme(legend.position='bottom')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRP_short
+```
+Firstly, Exp1 and Exp2 showed similar pattern.
+Note that in the short range, the weight of local prior was quite high, so mean reprodution of short range reflects some characters of local priors.
+
+
+For short range:
+When the first session is short session, the BR short was the first session.  As shown in figure, the BR condition the reproduction had stronger central tendency effect(underestimated) than when the first session is long session.
+
+When the first session is short session, then the prior session of IR condition is long session. In the IR condition, the reproduction (long session as prior session) had a weaker central tendency effect(overestimation) than when the first session is long session(short  session as prior session).
+
+For long range: (see below)
+
+
+
+```{r}
+fig_mRP_long <- ggplot(sumexp %>% filter(range == 'long'),
+       aes(targetDur, m_m_RP, group = interaction(priortype, firstSession), color = firstSession, shape = priortype)) + 
+  geom_point(size = 2,position = position_dodge(width = 0.02)) + 
+  geom_line(aes(linetype = priortype),position = position_dodge(width = 0.02))+
+  #geom_errorbar(aes(ymin = m_m_RP- m_se_err , ymax = m_m_RP + m_se_err), width = 0.02, position = position_dodge(width = 0.02)) + 
+  geom_abline(slope = 1, linetype=3, size =0.2) + # add diagonal line
+  facet_wrap(range~Exp) +
+  theme_new + scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + 
+  labs(x = 'Intervals (s)', y = 'Mean reproductions (s)', color='Session order', shape = 'Condition', linetype ='Condition')+ theme(legend.position='bottom')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRP_long
+```
+```{r}
+fig_mRP_sessionOrder<- ggarrange(fig_mRP_short, fig_mRP_long, common.legend = TRUE, labels = c('a', 'b'), nrow = 1,ncol = 2)
+ggsave(file.path(figure_path,'fig_mRP_sessionOrder.png'), fig_mRP_sessionOrder, width = 8, height = 3.5)
+fig_mRP_sessionOrder
+```
+
+
+
+## plot scatter reproduction
+
+```{r}
+#short group
+fig_mRep_scatter_s = ggplot(exps %>% filter(range == 'short'),
+                                 aes(targetDur, RP, group = interaction(priortype, firstSession), color = firstSession, linetype = priortype)) + 
+  geom_point(size = 0.3, position = position_dodge(width = 0.04), alpha=0.3) + 
+  geom_point(data =sumexp %>% filter(range == 'short'), aes(targetDur, m_m_RP, group = interaction(priortype,firstSession), color = firstSession, linetype = priortype),  position = position_dodge(width = 0.04)) + 
+  geom_line(data =sumexp%>% filter(range == 'short'), aes(targetDur, m_m_RP, group = interaction(priortype, firstSession), color = firstSession, linetype = priortype))+ 
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line+
+  theme_new+ 
+  facet_wrap(~Exp)+
+  scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals in Exp.1 (s)', y = 'Reproduction in Exp.1 (s)', color='condition')+
+  theme(legend.position = 'none')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRep_scatter_s
+```
+
+
+```{r}
+#long group 
+fig_mRep_scatter_l = ggplot(exps %>% filter(range == 'long'),
+                                 aes(targetDur, RP, group = interaction(priortype, firstSession), color = firstSession, linetype = priortype)) + 
+  geom_point(size = 0.3, position = position_dodge(width = 0.04), alpha=0.3) + 
+  geom_point(data =sumexp %>% filter(range == 'long'), aes(targetDur, m_m_RP, group = interaction(priortype,firstSession), color = firstSession, linetype = priortype),  position = position_dodge(width = 0.04)) + 
+  geom_line(data =sumexp%>% filter(range == 'long'), aes(targetDur, m_m_RP, group = interaction(priortype, firstSession), color = firstSession, linetype = priortype))+ 
+  geom_abline(slope = 1, linetype = 2) + # add diagonal line+
+  theme_new+ 
+  facet_wrap(~Exp)+
+  scale_color_manual(values = mycolors) +
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Intervals in Exp.1 (s)', y = 'Reproduction in Exp.1 (s)', color='condition')+
+  theme(legend.position = 'none')+
+  scale_y_continuous(trans='log10')+ #Transform y axis to log10 scale
+  scale_x_continuous(trans='log10') #Transform x axis to log10 scale
+
+fig_mRep_scatter_l
+```
+
+## observed CV for each subject
+
+
+```{r}
+m_expSub <- sumexpSub %>% dplyr::group_by(targetDur, Exp, priortype, range, firstSession) %>%
+  dplyr::summarize(m_CV= mean(CV))
+
+fig_NBIAS_CV_sub= ggplot(sumexpSub, aes(targetDur, CV, group = interaction(priortype, range, firstSession), color = firstSession, linetype = priortype))+
+  geom_point(alpha = 0.5, size =0.4)+
+  geom_point(m_expSub, mapping = aes(targetDur, m_CV, group = interaction(priortype, range, firstSession), color = firstSession, linetype = priortype), size = 2)+
+  geom_line(m_expSub, mapping = aes(targetDur, m_CV, group = interaction(priortype, range, firstSession), color = firstSession, linetype = priortype))+
+  theme_new+ 
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = 'Sample intervals', y = 'Coefficient of Variance')+
+  theme(legend.position='bottom')+theme(legend.title = element_blank())+
+  scale_shape_manual(values=c(15, 16))+
+  facet_wrap(~Exp)+
+  scale_color_manual(values = mycolors) 
+
+fig_NBIAS_CV_sub
+```
+
+
+
+# anova on reproduction error 
+
+```{r}
+gp_var_prior= c("NSub", "firstSession", "Exp", "priortype", "range")
+sumexpSub <-summarizedata(exps, gp_var_prior)
+write.csv(sumexpSub, file = paste0("generated/sumexpSub_SessionOrder.csv"))
+
+jasp_RP_Err_SessionOrder <- sumexpSub%>% select(c("NSub", "firstSession", "Exp", "priortype", "range", "m_err"))%>%
+    unite(p_g, m_err)%>%
+    spread(priortype, p_g)%>%
+    separate(`BR`, c("BR_m_err"), sep = "_")%>%
+    separate(`IR`, c("IR_m_err"), sep = "_")%>%
+     unite(m_err, BR_m_err, IR_m_err)%>%
+    spread(range, m_err)%>%
+    separate(`long`, c("long_BR_m_err", "long_IR_m_err"), sep = "_")%>%
+    separate(`short`, c("short_BR_m_err", "short_IR_m_err"), sep = "_")
+
+write.csv(jasp_RP_Err_SessionOrder, file = paste0("jasp/jasp_globalprior_exp_SO.csv"))
+  
+```
+
+
+```{r}
+ezANOVA(data = sumexpSub, dv= m_RP, wid=NSub, within=.(priortype, range), between = .(Exp,firstSession))
+```
+
+
+```{r}
+ezANOVA(data = sumexpSub%>%filter(Exp =="Exp1"), dv= m_err, wid=NSub, within=.(range), between = .(firstSession))
+```
+
+```{r}
+ezANOVA(data = sumexpSub%>%filter(Exp =="Exp1"), dv= m_err, wid=NSub, within=.(priortype, range), between = .(firstSession))
+```
+```{r}
+ezANOVA(data = sumexpSub%>%filter(Exp =="Exp1"), dv= m_RP, wid=NSub, within=.(priortype, range), between = .(firstSession))
+```
+
+
+```{r}
+ezANOVA(data = sumexpSub%>%filter(Exp =="Exp2"), dv= m_err, wid=NSub, within=.(priortype, range), between = .(firstSession))
+```
+
+
+```{r}
+ezANOVA(data = sumexpSub%>%filter(Exp =="Exp2"), dv= m_err, wid=NSub, within=.(range, priortype), between = .(firstSession))
+```

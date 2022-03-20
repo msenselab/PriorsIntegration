@@ -1,0 +1,5 @@
+"0","fig_CI1 <- ggpubr::ggarrange(fig.mCI.bar, fig_stimuli_bar, common.legend = FALSE, legend = 'bottom', labels = c('a', 'b'), ncol =2, nrow =1, widths = c(5,4))"
+"0",""
+"0","ggsave(file.path('figures','fig_CI1.png'), fig_CI1, width = 8, height = 4)"
+"0",""
+"0","fig_CI1"

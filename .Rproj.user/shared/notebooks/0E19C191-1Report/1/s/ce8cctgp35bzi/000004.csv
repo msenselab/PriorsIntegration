@@ -1,0 +1,12 @@
+"0","fig.mCI.bar.exp1 <- ggplot(mslope_pr %>% filter(Exp =='Exp1'), aes(x = range, y = m_CI, group = priortype, fill = priortype)) + "
+"0","  geom_bar(stat=""identity"", position=position_dodge())+"
+"0","  geom_errorbar(width=.2, aes(ymin = m_CI- se_CI, ymax = m_CI + se_CI), width=.2,position=position_dodge(.9)) +"
+"0","  labs(x = ' ', y = 'Centrality index in Exp1', fill= 'condition') +"
+"0","  theme(legend.position = 'bottom', legend.title = element_blank())+"
+"0","  theme_new+"
+"0","  scale_fill_manual(values = mycolors)+"
+"0","  ylim(0, 0.8)"
+"2","Warning:"
+"2"," Duplicated aesthetics after name standardisation: width
+"
+"0","fig.mCI.bar.exp1"

@@ -1,0 +1,7 @@
+"0","#load the parameters from baseline model by fitting BR data "
+"0","All_PredY_BR= read.csv(paste0(getwd(), ""/RSTANMODELS/models/Baseline_log/All_PredY_BR.csv"")) "
+"0","All_PredY_BR$model = 'Baseline'"
+"0","All_PredY_BR$X = NULL"
+"0","All_PredY_BR1 = All_PredY_BR"
+"0","All_PredY_BR1$wp = NULL"
+"0","All_PredY_BR_col= colnames(All_PredY_BR1)"

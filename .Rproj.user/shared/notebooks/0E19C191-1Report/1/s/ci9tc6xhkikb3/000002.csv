@@ -1,0 +1,14 @@
+"0","fig_RP_pr <- ggpubr::ggarrange(fig_mRep_exp_scatter_exp1, fig_mrepError_pr_exp1, fig_diff_RP_exp1_Normalized, fig_mRep_exp_scatter_exp2, fig_mrepError_pr_exp2, fig_diff_RP_exp2_Normalized, common.legend = TRUE, legend = 'top', labels = c('a', 'b', 'c','d', 'e', 'f' ), ncol =3, nrow =2, widths = c(4,4,4))"
+"2","Warning:"
+"2"," position_dodge requires non-overlapping x intervals
+"
+"2","Warning:"
+"2"," position_dodge requires non-overlapping x intervals
+"
+"2","Warning:"
+"2"," position_dodge requires non-overlapping x intervals
+"
+"2","Warning:"
+"2"," position_dodge requires non-overlapping x intervals
+"
+"0","ggsave(file.path('figures','fig_RP_pr.png'), fig_RP_pr, width = 8, height = 7)"

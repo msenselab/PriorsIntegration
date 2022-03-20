@@ -1,0 +1,8 @@
+"0","AllDat_Bayparlist %>%"
+"0","  group_by(model,Exp) %>%"
+"0","  summarise(m_mu_p_g = mean(mu_p_g), n=n(), se = sd(mu_p_g)/sqrt(n-1)) %>% ggplot(aes(model, m_mu_p_g, color = model)) + geom_line()+ geom_point() + geom_errorbar(aes(ymin = m_mu_p_g - se, ymax = m_mu_p_g + se ), width = 1) +"
+"0","  xlab('models') + ylab('mean of global prior') +"
+"0","  facet_grid(~Exp)+ theme_new"
+"2","Error: `n()` must only be used inside dplyr verbs.
+[90mRun `rlang::last_error()` to see where the error occurred.[39m
+"

@@ -1,0 +1,8 @@
+"0","m_parameter_BR_sub = All_PredY_BR %>% dplyr::group_by(NSub, Exp, group) %>%"
+"0","  dplyr::summarise(mRP = mean(RP),  n= n(), m_wp = mean(wp), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP),  sd_wp = sd(wp),  sd_mu_r = sd(mu_r), sd_sig_r = sd(sig_r))"
+"1","`summarise()` has grouped output by 'NSub', 'Exp'. You can override using the `.groups` argument.
+"
+"0","mm_parameter_BR = All_PredY_BR %>% dplyr::group_by(Exp, group) %>%"
+"0","  dplyr::summarise(mRP = mean(RP),  n= n(), m_wp = mean(wp), m_mu_r = mean(mu_r), m_sig_r = sd(sig_r), sd_RP = sd(RP),  sd_wp = sd(wp),  sd_mu_r = sd(mu_r), sd_sig_r = sd(sig_r))"
+"1","`summarise()` has grouped output by 'Exp'. You can override using the `.groups` argument.
+"

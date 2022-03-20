@@ -1,0 +1,433 @@
+---
+title: "runRstanModel"
+author: "Xiuna Zhu"
+date: "26/09/2021"
+output: 
+  html_document:
+    df_print: paged
+    number_sections: true
+  pdf_document: 
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Load the packages
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+source('ana_functions.R')
+source('RStanCode/rstan_functions.R')
+library('rstan')
+rstanmodelPath = 'RSTANMODELS'
+AllExpData <- read.csv(paste0("data/AllExpData_valid.csv"))
+```
+
+```{r include=FALSE}
+library(parallel)
+library(doParallel)
+options(mc.cores = parallel::detectCores()-1)
+rstan_options (auto_write=TRUE)
+```
+
+
+##  run Baseline model
+```{r}
+baselinePath = paste0(rstanmodelPath, '/models/Baseline_linear')
+runModelBaseline<- function(AllExpData){
+  expList <- unique(AllExpData$Exp)
+  rltall <- list()
+  myBaselineModel <- stan_model(file="RStanCode/baseline_linear.stan") # Create model object (generates and compiles C++ code)
+  for (expName in expList) {
+    data_exp <- AllExpData %>% dplyr::filter(valid  == 1 & Exp == expName)
+    sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
+    subList <- unique(data_exp$NSub)
+    for (subNo in subList) {
+      rlt = funFitStanBaseline_linear(sub_exp[[subNo]], myBaselineModel)
+      saveRDS(rlt, file = paste0(baselinePath, "/rlt_Base_linear_",expName,"_", subNo,".rds"))
+      rltall <- list.append(rltall, rlt)
+    }
+  }
+  saveRDS(rltall, file = paste0(baselinePath, "/rlt_Baseline_linear.rds"))
+}
+#runModelBaseline(AllExpData)
+```
+
+## merge resluts of Baseline model
+```{r}
+#function to merge the baseline model results
+funBaselineRlt <- function(path){
+  AllDat_Bayparlist <- {}
+  PredY_s_list <- {}
+  PredY_l_list <- {}
+  NewY_s_list <- {}
+  NewY_l_list <- {}
+  PredY_mix_list <- {}
+  NewY_mix_list <- {}
+  modelResultAll <- list()
+  bl_rlt = readRDS(paste0(getwd(), "/", path, "/rlt_Baseline_linear.rds"))
+  for (i in 1:length(bl_rlt)){
+    modelResultAll <- list.append(modelResultAll,bl_rlt[[i]])
+    AllDat_Bayparlist <- rbind(AllDat_Bayparlist, bl_rlt[[i]]$Baypar)
+    PredY_s_list <- rbind(PredY_s_list, bl_rlt[[i]]$PredY_s_list)
+    PredY_l_list <- rbind(PredY_l_list, bl_rlt[[i]]$PredY_l_list)
+    NewY_l_list <- rbind(NewY_l_list, bl_rlt[[i]]$NewY_l_list)
+    NewY_s_list <- rbind(NewY_s_list, bl_rlt[[i]]$NewY_s_list)
+    PredY_mix_list <- rbind(PredY_mix_list, bl_rlt[[i]]$PredY_mix_list)
+    NewY_mix_list <- rbind(NewY_mix_list, bl_rlt[[i]]$NewY_mix_list)
+  }
+  
+  write.csv(AllDat_Bayparlist, paste0(getwd(), "/", path, "/AllDat_Bayparlist_BR.csv"))
+  All_PredY <- rbind(PredY_s_list, PredY_l_list)
+  write.csv(All_PredY, paste0(getwd(), "/", path, "/All_PredY_BR.csv"))
+  write.csv(PredY_mix_list, paste0(getwd(), "/", path, "/PredY_IP.csv"))
+  write.csv(NewY_mix_list, paste0(getwd(), "/", path, "/NewY_IP.csv")) 
+}
+funBaselineRlt(baselinePath)
+
+```
+
+
+### Definition of the function to merge rstan result data
+To further uncover the underlying structure of the prior, we hypothesize that in addition to two local priors, there is a general global prior. Participants may combine both local and global priors for the final reproduction. 
+
+There are multiple possibilities for integrating those local and global priors with the sensory inputs. For examples, the sensory input could first integrate with the local prior, and then integrate with the global prior (a hierarchical local-global model, see Figure 7B in D1 proposal). 
+
+Our Hypothesis
+
+* H1:  A hierarchical local-global model (LGM)
+In H2, global and local priors are integrated first. That means local prior is integrated with sensory input firstly, then global prior integrates with sensory input. 
+The sensory input ($D_s$) first integrates with the local prior ($P_L$) to a posterior ($D_L$), which further integrates with the global prior ($P_G$) to generate a final posterior for reproduction ($D_r$).
+
+
+* H2: Global prior (dual integration model: DIM)
+
+Both local and global priors independently integrate with the sensory inputs to generate two posteriors ($D_L$) and ($D_G$), the latter two are combined together for reproduction ($D_r$).
+
+* H3: Integrated prior (Prior integration model:PIM)
+
+Local integrates with global prior firstly,then the posterior of prior integration integrated with the sensory inputs to generate two posteriors ($D_L$) and ($D_G$), the latter tw are combined together for reproduction ($D_r$).
+
+
+## models for IR session data
+
+#### run models locally
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+#source('RStanCode/rstan_linear.R')  
+modelPath = paste0(rstanmodelPath, '/models/linear')
+
+# function to run models on local computer
+modellist <- c('LGM','DIM', 'PIM', 'IP')#'Baseline' 'BPM', 
+runModelonlocal<- function(AllExpData, model){
+  expList <- unique(AllExpData$Exp)
+  rltall <-list()
+  myrstanModel = NULL
+  myrstanModel <- rstan::stan_model(file=paste0("RStanCode/", model, "_linear.stan")) 
+  for (expName in expList) {
+    data_exp <- AllExpData %>% dplyr::filter(valid == 1 & Exp == expName)
+    data_exp$model <- model
+    sub_exp <-  split(data_exp, data_exp$NSub) 
+    subList <- unique(data_exp$NSub)
+    for (subNo in subList) {
+      subdata_mix <- sub_exp[[subNo]] %>% dplyr::filter(group == 'mixed')  # mixed groups 
+      subdata_mix = mutate(subdata_mix, id = row_number())
+      rlt = funFitStanSub(subdata_mix, myrstanModel, 'all', 'linear')
+      saveRDS(rlt, file = paste0(modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,".rds"))
+      rltall <- list.append(rltall, rlt)
+    }
+  }
+  saveRDS(rltall, file = paste0(modelPath, "/rlt/rlt_", model,".rds"))
+}
+
+##execute the model running
+for(model in modellist){
+  runModelonlocal(AllExpData, model)
+}
+```
+
+
+
+
+#### fit first half data and second half data separately
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+#source('RStanCode/rstan_linear_2part.R')  
+modelPath = paste0(rstanmodelPath, '/models/linear_2part')
+
+runModelonlocal_2part<- function(AllExpData, model){
+  expList <- unique(AllExpData$Exp)
+  rltall <-list()
+  myrstanModel = NULL
+  myrstanModel <- rstan::rstan::stan_model(file=paste0("RStanCode/", model, "_linear.stan")) 
+  for (expName in expList) {
+    data_exp <- AllExpData %>% dplyr::filter(valid == 1 & Exp == expName)
+    data_exp$model <- model
+    sub_exp <-  split(data_exp, data_exp$NSub) 
+    subList <- unique(data_exp$NSub)
+    for (subNo in subList) {
+      subdata_mix <- sub_exp[[subNo]] %>% dplyr::filter(group == 'mixed')  # mixed groups 
+      subdata_mix = mutate(subdata_mix, id = row_number())
+      total = nrow(subdata_mix)
+      rlt1 = funFitStanSub(subdata_mix%>%filter(id < total/2), myrstanModel, 'part1','linear')
+      rlt2 = funFitStanSub(subdata_mix%>%filter(id >= total/2), myrstanModel, 'part2', 'linear')
+      saveRDS(rlt1, file = paste0( modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,"_p1.rds"))
+      saveRDS(rlt2, file = paste0(modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,"_p2.rds"))
+      rltall <- list.append(rltall, rlt1)
+      rltall <- list.append(rltall, rlt2)
+    }
+  }
+  saveRDS(rltall, file = paste0(modelPath, "/rlt/rlt_", model,"_2part.rds"))
+}
+
+#execute the model
+for(model in modellist){
+  runModelonlocal_2part(AllExpData, model)
+}
+```
+
+
+###  fit half data parallely
+```{r}
+runModelParallel_2part<- function(AllExpData, model){
+  expList <- unique(AllExpData$Exp)
+  rltall <-list()
+  sub_exp_dat <- list()
+   for (expName in expList) {
+    data_exp <- AllExpData %>% dplyr::filter(valid == 1 & Exp == expName)
+    data_exp$model <- model
+    sub_exp <-  split(data_exp, data_exp$NSub) 
+    subList <- unique(data_exp$NSub)
+    for (subNo in subList) {
+      subdata_mix <- sub_exp[[subNo]] %>% dplyr::filter(group == 'mixed')  # mixed groups 
+      subdata_mix = mutate(subdata_mix, id = row_number())
+      total = nrow(subdata_mix)
+      # rlt1 = funFitStanSub(subdata_mix%>%filter(id < total/2), myrstanModel, 'part1','linear')
+      # rlt2 = funFitStanSub(subdata_mix%>%filter(id >= total/2), myrstanModel, 'part2', 'linear')
+      sub_exp_dat = list.append(sub_exp_dat, subdata_mix%>%filter(id < total/2))
+  
+      #rlt2 = runModelcluster(subdata_mix%>%filter(id >= total/2))
+      #saveRDS(rlt1, file = paste0(getwd(), "/", modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,"_p1.rds"))
+      #saveRDS(rlt2, file = paste0(getwd(), "/", modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,"_p2.rds"))
+      #rltall <- list.append(rltall, rlt1)
+      #rltall <- list.append(rltall, rlt2)
+    }
+   }
+  rlt1 <- runModelcluster(sub_exp_dat)
+  saveRDS(rlt1, file = paste0(getwd(), "/", modelPath, "/rlt/rlt_", model,"_part1.rds"))
+}
+
+#Parallel compute parameters for each subject each model
+runModelcluster<- function(sub_exp_dat){
+  cl <- makeCluster(detectCores()-1 )
+  clusterEvalQ(cl, {library(dplyr, rstan) })
+  clusterExport(cl, c('funFitStanSub'))
+  t0 = proc.time()
+  resultlist <- clusterMap(cl, funFitStanSub, sub_exp_dat)
+  stopCluster(cl)
+  print(proc.time()-t0)
+  return(resultlist)
+}
+
+# #execute the model
+# for(model in modellist){
+#   runModelParallel_2part(AllExpData, model)
+# }
+```
+
+
+
+
+---
+title: "runRstanModel"
+author: "Xiuna Zhu"
+date: "26/09/2021"
+output: 
+  html_document:
+    df_print: paged
+    number_sections: true
+  pdf_document: 
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Load the packages
+
+```{r message=FALSE, warning=FALSE}
+source('ana_functions.R')
+source('RStanCode/rstan_functions.R')
+library('rstan')
+rstanmodelPath = 'RSTANMODELS'
+AllExpData <- read.csv(paste0("data/AllExpData_valid.csv"))
+```
+
+```{r}
+library(parallel)
+library(doParallel)
+options(mc.cores = parallel::detectCores()-1)
+rstan_options (auto_write=TRUE)
+```
+
+
+
+##  run Baseline model
+```{r}
+baselinePath = paste0(rstanmodelPath, '/models/Baseline_linear')
+runModelBaseline<- function(AllExpData){
+  expList <- unique(AllExpData$Exp)
+  rltall <- list()
+  myBaselineModel <- stan_model(file="RStanCode/baseline_linear.stan") # Create model object (generates and compiles C++ code)
+  for (expName in expList) {
+    data_exp <- AllExpData %>% dplyr::filter(valid  == 1 & Exp == expName)
+    sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
+    subList <- unique(data_exp$NSub)
+    for (subNo in subList) {
+      rlt = funFitStanBaseline_linear(sub_exp[[subNo]], myBaselineModel)
+      saveRDS(rlt, file = paste0(baselinePath, "/rlt_Base_linear_",expName,"_", subNo,".rds"))
+      rltall <- list.append(rltall, rlt)
+    }
+  }
+  saveRDS(rltall, file = paste0(baselinePath, "/rlt_Baseline_linear.rds"))
+}
+#runModelBaseline(AllExpData)
+```
+
+## merge resluts of Baseline model
+```{r}
+#function to merge the baseline model results
+funBaselineRlt <- function(path){
+  AllDat_Bayparlist <- {}
+  PredY_s_list <- {}
+  PredY_l_list <- {}
+  NewY_s_list <- {}
+  NewY_l_list <- {}
+  PredY_mix_list <- {}
+  NewY_mix_list <- {}
+  modelResultAll <- list()
+  bl_rlt = readRDS(paste0(getwd(), "/", path, "/rlt_Baseline_linear.rds"))
+  for (i in 1:length(bl_rlt)){
+    modelResultAll <- list.append(modelResultAll,bl_rlt[[i]])
+    AllDat_Bayparlist <- rbind(AllDat_Bayparlist, bl_rlt[[i]]$Baypar)
+    PredY_s_list <- rbind(PredY_s_list, bl_rlt[[i]]$PredY_s_list)
+    PredY_l_list <- rbind(PredY_l_list, bl_rlt[[i]]$PredY_l_list)
+    NewY_l_list <- rbind(NewY_l_list, bl_rlt[[i]]$NewY_l_list)
+    NewY_s_list <- rbind(NewY_s_list, bl_rlt[[i]]$NewY_s_list)
+    PredY_mix_list <- rbind(PredY_mix_list, bl_rlt[[i]]$PredY_mix_list)
+    NewY_mix_list <- rbind(NewY_mix_list, bl_rlt[[i]]$NewY_mix_list)
+  }
+  
+  write.csv(AllDat_Bayparlist, paste0(getwd(), "/", path, "/AllDat_Bayparlist_BR.csv"))
+  All_PredY <- rbind(PredY_s_list, PredY_l_list)
+  write.csv(All_PredY, paste0(getwd(), "/", path, "/All_PredY_BR.csv"))
+  write.csv(PredY_mix_list, paste0(getwd(), "/", path, "/PredY_IP.csv"))
+  write.csv(NewY_mix_list, paste0(getwd(), "/", path, "/NewY_IP.csv")) 
+}
+#funBaselineRlt(baselinePath)
+```
+
+
+### Definition of the function to merge rstan result data
+To further uncover the underlying structure of the prior, we hypothesize that in addition to two local priors, there is a general global prior. Participants may combine both local and global priors for the final reproduction. 
+
+There are multiple possibilities for integrating those local and global priors with the sensory inputs. For examples, the sensory input could first integrate with the local prior, and then integrate with the global prior (a hierarchical local-global model, see Figure 7B in D1 proposal). 
+
+Our Hypothesis
+
+* H1:  A hierarchical local-global model (LGM)
+In H2, global and local priors are integrated first. That means local prior is integrated with sensory input firstly, then global prior integrates with sensory input. 
+The sensory input ($D_s$) first integrates with the local prior ($P_L$) to a posterior ($D_L$), which further integrates with the global prior ($P_G$) to generate a final posterior for reproduction ($D_r$).
+
+
+* H2: Global prior (dual integration model: DIM)
+
+Both local and global priors independently integrate with the sensory inputs to generate two posteriors ($D_L$) and ($D_G$), the latter two are combined together for reproduction ($D_r$).
+
+* H3: Integrated prior (Prior integration model:PIM)
+
+Local integrates with global prior firstly,then the posterior of prior integration integrated with the sensory inputs to generate two posteriors ($D_L$) and ($D_G$), the latter tw are combined together for reproduction ($D_r$).
+
+
+## models for IR session data
+
+#### run models locally in one step
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+#source('RStanCode/rstan_linear.R')  
+modelPath = paste0(rstanmodelPath, '/models/linear')
+
+# function to run models on local computer
+modellist <- c('LGM','DIM', 'PIM', 'IP')#'Baseline' 'BPM', 
+runModelonlocal<- function(AllExpData, model){
+  expList <- unique(AllExpData$Exp)
+  rltall <-list()
+  myrstanModel = NULL
+  myrstanModel <- rstan::stan_model(file=paste0("RStanCode/", model, "_linear.stan")) 
+  for (expName in expList) {
+    data_exp <- AllExpData %>% dplyr::filter(valid == 1 & Exp == expName)
+    data_exp$model <- model
+    sub_exp <-  split(data_exp, data_exp$NSub) 
+    subList <- unique(data_exp$NSub)
+    for (subNo in subList) {
+      subdata_mix <- sub_exp[[subNo]] %>% dplyr::filter(group == 'mixed')  # mixed groups 
+      subdata_mix = mutate(subdata_mix, id = row_number())
+      rlt = funFitStanSub(subdata_mix, myrstanModel, 'all', 'linear')
+      saveRDS(rlt, file = paste0(modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,".rds"))
+      rltall <- list.append(rltall, rlt)
+    }
+  }
+  saveRDS(rltall, file = paste0(modelPath, "/rlt/rlt_", model,".rds"))
+}
+
+# ##execute the model running
+# for(model in modellist){
+#   runModelonlocal(AllExpData, model)
+# }
+```
+
+
+
+
+#### fit model locally in two steps
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+#fit first half data and second half data separately
+#source('RStanCode/rstan_linear_2part.R')  
+modelPath = paste0(rstanmodelPath, '/models/linear_2part')
+
+runModelonlocal_2part<- function(AllExpData, model){
+  expList <- unique(AllExpData$Exp)
+  rltall <-list()
+  myrstanModel = NULL
+  myrstanModel <- rstan::stan_model(file=paste0("RStanCode/", model, "_linear.stan")) 
+  for (expName in expList) {
+    data_exp <- AllExpData %>% dplyr::filter(valid == 1 & Exp == expName)
+    data_exp$model <- model
+    sub_exp <-  split(data_exp, data_exp$NSub) 
+    subList <- unique(data_exp$NSub)
+    for (subNo in subList) {
+      subdata_mix <- sub_exp[[subNo]] %>% dplyr::filter(group == 'mixed')  # mixed groups 
+      subdata_mix = mutate(subdata_mix, id = row_number())
+      total = nrow(subdata_mix)
+      rlt1 = funFitStanSub(subdata_mix%>%filter(id < total/2), myrstanModel, 'part1','linear')
+      rlt2 = funFitStanSub(subdata_mix%>%filter(id >= total/2), myrstanModel, 'part2', 'linear')
+      saveRDS(rlt1, file = paste0( modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,"_p1.rds"))
+      saveRDS(rlt2, file = paste0(modelPath, "/rlt/rlt_",subNo,"_", expName,"_", model,"_p2.rds"))
+      rltall <- list.append(rltall, rlt1)
+      rltall <- list.append(rltall, rlt2)
+    }
+  }
+  saveRDS(rltall, file = paste0(modelPath, "/rlt/rlt_", model,"_2part.rds"))
+}
+
+# #execute the model
+# for(model in modellist){
+#   runModelonlocal_2part(AllExpData, model)
+# }
+```
+

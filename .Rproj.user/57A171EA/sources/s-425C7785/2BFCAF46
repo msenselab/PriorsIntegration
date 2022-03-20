@@ -1,0 +1,26 @@
+{
+    "id": "2BFCAF46",
+    "path": "~/mlabRepository/PriorsIntegration/data_preprocessing.R",
+    "project_path": "data_preprocessing.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1647537355169.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "144,44",
+        "scrollLine": "128"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1647537370,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1647537370715,
+    "read_only": false,
+    "read_only_alternatives": []
+}

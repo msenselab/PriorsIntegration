@@ -1,0 +1,709 @@
+---
+title: "ModelReport"
+author: "Fiona Zhu"
+date: "05/03/2020"
+header-includes:
+   - \usepackage{amsmath}
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Load the packages
+```{r}
+library(tidyverse)
+library(rstan)
+library(readr)
+library(plyr)
+```
+
+
+```{r}
+options(mc.cores = parallel::detectCores())
+rstan_options (auto_write=TRUE)
+# flag for saving figures 
+saveFigure = TRUE
+# flag for generating CSV  
+generateSCV = TRUE
+# flag for running rstan model and saving the results
+runModels = FALSE
+# path of model result
+rstanmodelPath = 'RSTANMODELS'
+modelResultPath = paste0(rstanmodelPath, '/Version4')
+```
+
+## load experimental data
+
+```{r include=FALSE}
+## generate the Baseline parameters
+AllExpData <- read_csv(paste0("data/AllExpData.csv"))
+```
+
+
+
+## RStan Models
+
+### Definition of the function to merge rstan result data
+To further uncover the underlying structure of the prior, we hypothesize that in addition to two local priors, there is a general global prior.Participants may combine both local and global priors for the final reproduction. There are multiple possibilities for integrating those local and global priors with the sensory inputs. For examples, the sensory input could first integrate with the local prior, and then integrate with the global prior (a hierarchical local-global model, see Figure 7B in D1 proposal). 
+
+Our Hypothesis
+
+* H1:  Short and long is independent
+
+* H3:  A hierarchical local-global model
+In H3, global and local priors are integrated first. That means local prior is integrated with sensory input firstly, then global prior integrates with sensory input. 
+
+The sensory input ($D_s$) first integrates with the local prior ($P_L$) to a posterior ($D_L$), which further integrates with the global prior ($P_G$) to generate a final posterior for reproduction ($D_r$).
+
+
+* H4: Global prior (the dual integration model)
+
+integration of local priors firstly, then integration of the global prior
+
+Both local and global priors independently integrate with the sensory inputs to generate two posteriors ($D_L$) and ($D_G$), the latter two are combined together for reproduction ($D_r$).
+
+
+#### Merg different version of model results
+
+```{r}
+# this R script is designed for the analysis of the result of Rstan model.
+mergeData <- function(cvsfiles, filename, versionlist){
+  merge.data.all = {}
+  for(version in versionlist){
+    merge.data = {}
+    dataDir <- paste0(rstanmodelPath, "/", version,"/data" )
+    merge.data <- read.csv(file.path(dataDir, cvsfiles[1]),  header=T)
+    merge.data$model = modellist[1]
+    if (length(cvsfiles) >= 2) {
+      for (i in 2:length(cvsfiles)){
+        new.data = read.csv(file.path(dataDir, cvsfiles[i]),  header=T)
+        new.data$model = modellist[i]
+        merge.data = rbind(merge.data,new.data)
+      }
+    }
+    merge.data$version=version
+    merge.data.all = rbind(merge.data.all, merge.data)
+    
+  }
+  savedataDir <- file.path(paste0(rstanmodelPath, "/AllDat_", filename, ".csv"))
+  write.csv(file=savedataDir, merge.data.all)
+}
+```
+
+
+
+### H3:  A hierarchical local-global model
+```{r}
+stancodeH3 <- '
+//In H3, global and local priors are integrated first. That means local prior is integrated with sensory input firstly, 
+// then global prior integrates with sensory input. 
+data {  
+int nsubjs;
+int<lower=0> n_s;  //number of the short group baseline data points
+int<lower=0> n_l;  //number of the long group baseline data points
+real Y_s[nsubjs, n_s];   //measured reproductive duration (short group)
+real X_s[nsubjs, n_s];   //stimulus duration (short group)
+real Y_l[nsubjs, n_l];   //measured reproductive duration (long group)
+real X_l[nsubjs, n_l];   //stimulus duration (long group)
+
+int<lower=0> n_mix; //number of the up mixed data points
+real X_mix[nsubjs, n_mix]; //measured reproductive duration (mixed) 
+real Y_mix[nsubjs, n_mix]; //measured reproductive duration (mixed) 
+int<lower=0> n_mix_te; //number of the up mixed data points (test the model)
+real X_mix_te[nsubjs, n_mix_te]; //measured reproductive duration (mixed)
+}
+
+parameters { 
+real<lower=0, upper = 1> p_wf;  //Weber Fraction of prior
+real<lower=0, upper = 1> wf;  //Weber Fraction of prior
+real<lower=0> sigma;   //sd 
+real<lower=0, upper = 1> g_wf;  //Webber Fraction for the global prior
+vector[nsubjs] a_s;
+vector[nsubjs] b_s;
+vector[nsubjs] a_l;
+vector[nsubjs] b_l;
+}
+
+
+model {
+real p_mix[nsubjs, n_mix];
+real p_sig_mix[nsubjs, n_mix];
+real w_mix[nsubjs, n_mix];
+real d_mix_hat[nsubjs, n_mix];
+real var_mix[nsubjs, n_mix];
+real g_w_mix[nsubjs, n_mix];
+real y_mix_mean[nsubjs, n_mix];
+real sig_mix[nsubjs, n_mix];
+
+//hyperpriors
+a_s ~ normal(0, 1);   // short group intercept
+b_s ~ normal(1, 1);   // short group slope
+a_l ~ normal(0, 1);   // long group intercept
+b_l ~ normal(1, 1);   // long group slope
+
+for (sub in 1:nsubjs) {
+  for (i in 1:n_s)
+  {
+    if(X_s[sub, i] > 0){
+        Y_s[sub, i] ~ normal(a_s[sub] + b_s[sub] * X_s[sub, i], sigma); //short groups
+    }
+  }
+}
+ 
+for (sub in 1:nsubjs) {
+  for (j in 1:n_l)
+  {
+    if(X_l[sub, j] > 0){
+        Y_l[sub, j] ~ normal(a_l[sub] + b_l[sub] * X_l[sub, j], sigma); //long groups
+    }
+  }
+}
+
+for (sub in 1:nsubjs) {
+  for (m in 1:n_mix)  
+  {
+    if (X_mix[sub, m] > 1){
+      // integration of local priors firstly
+      if (X_mix[sub, m] < 1){
+        p_mix[sub, m] = a_s[sub] + b_s[sub] * X_mix[sub, m];
+      }else{
+        p_mix[sub, m] = a_l[sub] + b_l[sub] * X_mix[sub, m];
+      }
+       
+      p_sig_mix[sub, m] = p_mix[sub, m] * p_wf;
+      w_mix[sub, m] = p_sig_mix[sub, m]^2 / (p_sig_mix[sub, m]^2 +  (X_mix[sub, m]*wf)^2);
+      d_mix_hat[sub, m] = w_mix[sub, m] * X_mix[sub, m] + (1-w_mix[sub, m])*p_mix[sub, m];
+    
+      // posterior variances
+      var_mix[sub, m] = p_sig_mix[sub, m]^2 * (X_mix[sub, m]*wf)^2 / (p_sig_mix[sub, m]^2 + (X_mix[sub, m]*wf)^2);
+      // integration of the global prior
+      sig_mix[sub, m] = mean(X_mix[sub, 1:m])*g_wf;  //global prior of up mixed block 
+      g_w_mix[sub, m] = sig_mix[sub, m]^2 / (sig_mix[sub, m]^2 + var_mix[sub, m]);
+      y_mix_mean[sub, m] = g_w_mix[sub, m] * d_mix_hat[sub, m]  + (1-g_w_mix[sub, m]) * mean(X_mix[sub,:]);
+      Y_mix[sub, m] ~ normal(y_mix_mean[sub, m], sigma); 
+      
+    }
+
+  }
+}
+
+}
+
+generated quantities {
+real p_mix_new[nsubjs, n_mix];
+real p_sig_mix_new[nsubjs, n_mix];
+real w_mix_new[nsubjs, n_mix];
+real d_mix_hat_new[nsubjs, n_mix];
+real var_mix_new[nsubjs, n_mix];
+real g_w_mix_new[nsubjs, n_mix];
+real sig_mix_new[nsubjs, n_mix];
+real ynew_mix[nsubjs, n_mix];
+  
+
+for (sub in 1:nsubjs) {
+  for (m in 1:n_mix_te)  //prediction of up mixed range
+  {
+    if (X_mix_te[sub, m] > 0){
+          // integration of local priors firstly
+      if (X_mix_te[sub, m] < 1){
+        p_mix_new[sub, m] = a_s[sub] + b_s[sub] * X_mix_te[sub, m];
+      }else{
+        p_mix_new[sub, m] = a_l[sub] + b_l[sub] * X_mix_te[sub, m];
+      }
+      p_sig_mix_new[sub, m] = mean(X_mix[sub, 1:m])*g_wf;  //global prior of up mixed block  
+      
+      w_mix_new[sub, m] = p_sig_mix_new[sub, m]^2 / (p_sig_mix_new[sub, m]^2 +  (X_mix_te[sub, m]*wf)^2);
+      d_mix_hat_new[sub, m] = w_mix_new[sub, m] * X_mix_te[sub, m] + (1-w_mix_new[sub, m])*p_mix_new[sub, m];
+    
+      // posterior variances
+      var_mix_new[sub, m] = p_sig_mix_new[sub, m]^2 * (X_mix_te[sub, m]*wf)^2 / (p_sig_mix_new[sub, m]^2 + (X_mix_te[sub, m]*wf)^2);
+      // integration of the global prior
+      sig_mix_new[sub, m] = mean(X_mix_te[sub, 1:m])*g_wf;  //global prior of up mixed block 
+      g_w_mix_new[sub, m] = sig_mix_new[sub, m]^2 / (sig_mix_new[sub, m]^2 + var_mix_new[sub, m]);
+      ynew_mix[sub, m] = g_w_mix_new[sub, m] * d_mix_hat_new[sub, m]  + (1-g_w_mix_new[sub, m]) * mean(X_mix_te[sub, :]);
+    }
+  }
+}
+
+}
+'
+```
+
+### H4: Global prior (the dual integration model)
+```{r}
+stancodeH4 <- '//H4: The dual integration model
+//integration of local priors firstly, then integration of the global prior
+data {  
+int nsubjs;
+int<lower=0> n_s;  //number of the short group baseline data points
+int<lower=0> n_l;  //number of the long group baseline data points
+real Y_s[nsubjs, n_s];   //measured reproductive duration (short group)
+real X_s[nsubjs, n_s];   //stimulus duration (short group)
+real Y_l[nsubjs, n_l];   //measured reproductive duration (long group)
+real X_l[nsubjs, n_l];   //stimulus duration (long group)
+
+int<lower=0> n_mix; //number of the mixed data points
+real X_mix[nsubjs, n_mix]; //measured target duration (mixed group) 
+real Y_mix[nsubjs, n_mix]; //measured reproductive duration (mixed group) 
+int<lower=0> n_mix_te; //number of the mixed data points (test the model)
+real X_mix_te[nsubjs, n_mix_te]; //measured reproductive duration (up mixed)
+}
+
+parameters { 
+real<lower=0, upper = 1> p_wf;  //Weber Fraction of prior
+real<lower=0, upper = 1> wf;  //Weber Fraction of prior
+real<lower=0> sigma;   //sigma 
+real<lower=0, upper = 1> g_wf;  //Webber Fraction for the global prior
+vector[nsubjs] a_s;
+vector[nsubjs] b_s;
+vector[nsubjs] a_l;
+vector[nsubjs] b_l;
+}
+
+model {
+real w_mix[nsubjs, n_mix];
+real p_sig_mix[nsubjs, n_mix];
+real p_mix[nsubjs, n_mix];
+real pp_mix[nsubjs, n_mix];
+real pp_mix_var[nsubjs, n_mix];
+real pp_w[nsubjs, n_mix];
+real sig_mix[nsubjs, n_mix];
+
+
+//hyperpriors
+a_s ~ normal(0, 1);   // short group intercept
+b_s ~ normal(1, 1);   // short group slope
+a_l ~ normal(0, 1);   // long group intercept
+b_l ~ normal(1, 1);   // long group slope
+//priors
+
+
+//likelihood
+for (sub in 1:nsubjs) {
+  for (i in 1:n_s)
+  {
+    if(X_s[sub, i] > 0){
+      Y_s[sub, i] ~ normal(a_s[sub] + b_s[sub] * X_s[sub, i], sigma); //short groups
+    }
+  }
+}
+
+for (sub in 1:nsubjs) {
+  for (j in 1:n_l)
+  {
+    if(X_l[sub, j] > 0){
+      Y_l[sub, j] ~ normal(a_l[sub] + b_l[sub] * X_l[sub, j], sigma); //long groups
+    }
+  }
+}
+
+for (sub in 1:nsubjs) {
+  for (m in 1:n_mix)  //integration of local priors firstly
+  {
+    if(X_mix[sub, m] > 0){
+      // first integration 
+      if(X_mix[sub, m] < 1){
+        p_mix[sub, m] = a_s[sub] + b_s[sub] * X_mix[sub, m];
+      }
+      else{
+        p_mix[sub, m] = a_l[sub] + b_l[sub] * X_mix[sub, m];
+      }
+      sig_mix[sub, m] = mean(X_mix[sub, 1:m])*g_wf;  //global prior of up mixed block  
+      p_sig_mix[sub, m] = p_mix[sub, m] * p_wf;
+      w_mix[sub, m] = sig_mix[sub, m]^2 / (sig_mix[sub, m]^2 + p_sig_mix[sub, m]^2);
+      pp_mix[sub, m] = p_mix[sub, m] * w_mix[sub, m] + (1- w_mix[sub, m]) * mean( X_mix[sub, :]);
+      pp_mix_var[sub, m] = sig_mix[sub, m]^2* p_sig_mix[sub, m]^2/(sig_mix[sub, m]^2 + p_sig_mix[sub, m]^2);
+      pp_w[sub, m] = pp_mix_var[sub, m]  / (pp_mix_var[sub, m]  + X_mix[sub, m]^2 * wf^2);
+      Y_mix[sub, m] ~ normal(pp_w[sub, m] * X_mix[sub, m] + (1-pp_w[sub, m])*pp_mix[sub, m], sigma); 
+    }
+  }
+ }
+}
+
+
+generated quantities {
+real ynew_mix[nsubjs, n_mix];
+real w_mix_new[nsubjs, n_mix];
+real p_sig_mix_new[nsubjs, n_mix];
+real p_mix_new[nsubjs, n_mix];
+real pp_mix_new[nsubjs, n_mix];
+real pp_mix_var_new[nsubjs, n_mix];
+real pp_w_new[nsubjs, n_mix];
+real sig_mix_new[nsubjs, n_mix];
+
+for (sub in 1:nsubjs) {
+  for (m in 1:n_mix_te)  //prediction of up mixed range
+  {
+    // first integration 
+    if(X_mix_te[sub, m] < 1){
+      p_mix_new[sub, m] = a_s[sub] + b_s[sub] * X_mix[sub, m];
+    }
+    else{
+      p_mix_new[sub, m] = a_l[sub] + b_l[sub] * X_mix[sub,m];
+    }
+    sig_mix_new[sub, m] = mean(X_mix_te[sub, 1:m])*g_wf;  //global prior of up mixed block  
+    p_sig_mix_new[sub, m] = p_mix_new[sub, m] * p_wf;
+    w_mix_new[sub, m] = sig_mix_new[sub, m]^2 / (sig_mix_new[sub, m]^2 + p_sig_mix_new[sub, m]^2);
+    pp_mix_new[sub, m] = p_mix_new[sub, m] * w_mix_new[sub, m] + (1- w_mix_new[sub, m]) * mean(X_mix_te[sub, :]);
+    
+    pp_mix_var_new[sub, m] = sig_mix_new[sub, m]^2* p_sig_mix_new[sub, m]^2/(sig_mix_new[sub, m]^2 + p_sig_mix_new[sub, m]^2);
+    pp_w_new[sub, m] = pp_mix_var_new[sub, m]  / (pp_mix_var_new[sub, m]  + X_mix_te[sub, m]^2* wf^2);
+    ynew_mix[sub, m] = pp_w_new[sub, m] * X_mix_te[sub, m] + (1-pp_w_new[sub, m])*pp_mix_new[sub, m]; 
+  
+   }
+}
+  
+}
+'
+```
+
+
+#### predicte the parameters of Bayesian
+
+definisiton of the function to predicte the parameters of Bayesian by runing Rstan model
+
+```{r}
+funFitBayesianStanV4 <- function(data, rstanModel, filename){
+  Bayparlist = {}
+  PredYlist_mix  = {}
+  expList <- unique(data$Exp)
+  for (expName in expList) {
+    subdata <- data %>% filter(valid > 0 & Exp == expName)
+    subList <- unique(subdata$NSub)
+    nsubjs <- length(subList)
+    
+    # reform the data set
+    Y_s <- {}
+    n_s <- 0
+    X_s <- {}
+    Y_l <- {}
+    n_l <- 0
+    X_l <- {}
+    Y_mix <- {}
+    n_mix <- 0
+    X_mix <- {}
+    X_mix_te <- {}
+    n_mix_te <- {}
+    testdat_mix <- {}
+    list_Y_s <- list()
+    list_X_s <- list()
+    list_Y_l <- list()
+    list_X_l <- list()
+    list_Y_mix <- list()
+    list_X_mix <- list()
+    
+    for(i in 1 : nsubjs){
+      dat <- subdata %>% filter(NSub == i)
+      data_s<- dat %>% filter(group == 1)  # short groups 
+      data_l <- dat %>% filter(group == 2)  # long groups 
+      data_mix <- dat %>% filter(group == 3)  # mixed groups
+      list_Y_s[[1]] <- data.frame(Y_s)
+      list_Y_s[[2]] <- data.frame(t(data_s$RP))
+      Y_s <- rbind.fill(list_Y_s)
+      list_X_s[[1]] <- data.frame(X_s)
+      list_X_s[[2]] <- data.frame(t(data_s$targetDur))
+      X_s <- rbind.fill(list_X_s)
+      list_Y_l[[1]] <- data.frame(Y_l)
+      list_Y_l[[2]] <- data.frame(t(data_l$RP))
+      Y_l <- rbind.fill(list_Y_l)
+      list_X_l[[1]] <- data.frame(X_l)
+      list_X_l[[2]] <- data.frame(t(data_l$targetDur))
+      X_l <- rbind.fill(list_X_l)
+      list_Y_mix[[1]] <- data.frame(Y_mix)
+      list_Y_mix[[2]] <- data.frame(t(data_mix$RP))
+      Y_mix <- rbind.fill(list_Y_mix)
+      list_X_mix[[1]] <- data.frame(X_mix)
+      list_X_mix[[2]] <- data.frame(t(data_mix$targetDur))
+      X_mix <- rbind.fill(list_X_mix)
+      testdat_mix <- rbind.data.frame(testdat_mix, data.frame(data_mix[c('NSub','targetDur', 'RP','Exp','group')]))
+    }
+
+      Y_s[is.na(Y_s)] = 0  
+      X_s[is.na(X_s)] = 0  
+      Y_l[is.na(Y_l)] = 0 
+      X_l[is.na(X_l)] = 0 
+      X_mix[is.na(X_mix)] = 0 
+      Y_mix[is.na(Y_mix)] = 0 
+      X_mix_te <- X_mix
+      n_s <- ncol(X_s)
+      n_l <- ncol(X_l)
+      n_mix <-  ncol(X_mix)
+      n_mix_te <- n_mix
+      
+      stan_data<- list("nsubjs"=nsubjs, "Y_s"=Y_s, "n_s"=n_s, "X_s"=X_s, "Y_l"= Y_l, "X_l"=X_l, "n_l" = n_l, "X_mix" = X_mix, "Y_mix"=Y_mix, "n_mix" = n_mix, "X_mix_te" = X_mix_te, "n_mix_te" = n_mix_te) 
+    
+      
+       # fit models
+      subfit <- sampling(rstanModel, stan_data, chains =4)
+      ## Launch shinystan and save the resulting shinystan object
+      #sf_sso <- launch_shinystan(subfit)
+      #rdspath <- paste0("reproduction_outlier/data/sso_", subNo,"_",expName)
+      #save_rds(subfit, rdspath)
+      
+      # print(subfit)
+      # plot(subfit)
+      # stan_trace(subfit)
+      # stan_trace(subfit, inc_warmup = TRUE)
+      # pairs(subfit)
+      
+      
+      parameters <- c("a_s","b_s", "a_l","b_l", "sigma","wf","p_wf","g_wf","ynew_mix")  
+      fitpar <- summary(subfit, pars = parameters)$summary
+      
+      # fitpar <- summary(subfit, pars = parameters)$summary
+      #list_of_draws <- rstan::extract(subfit, pars = parameters)
+      list_of_draws <- rstan::extract(subfit, pars = parameters)
+       # Extracting the parameters
+      a_s_list =  list_of_draws$a_s
+      b_s_list = list_of_draws$b_s
+      a_l_list = list_of_draws$a_l
+      b_l_list = list_of_draws$b_l
+      wf = mean(list_of_draws$wf)
+      p_wf = mean(list_of_draws$p_wf)
+      g_wf = mean(list_of_draws$g_wf)
+
+      a_s = c(rep(0, nsubjs))
+      b_s = c(rep(0, nsubjs))
+      a_l = c(rep(0, nsubjs))
+      b_l = c(rep(0, nsubjs))
+      ynew_mix_lsit <- list_of_draws$ynew_mix
+      ynew_mix = matrix(rep(0, nsubjs*length(ynew_mix_lsit[1,1,])), nrow = length(ynew_mix_lsit[1,1,]))
+
+      # Constructing MAP-estimates of parameters
+      for (i in 1: nsubjs)
+      { 
+        a_s[i] = density(a_s_list[,i])$x[which(density(a_s_list[,i])$y ==  max(density(a_s_list[,i])$y))]
+        b_s[i] = density(b_s_list[,i])$x[which(density(b_s_list[,i])$y ==  max(density(b_s_list[,i])$y))]
+        a_l[i] = density(a_l_list[,i])$x[which(density(a_l_list[,i])$y ==  max(density(a_l_list[,i])$y))]
+        b_l[i] = density(b_l_list[,i])$x[which(density(b_l_list[,i])$y ==  max(density(b_l_list[,i])$y))]
+        for (j in 1: length(ynew_mix_lsit[1,1,])){
+          if(X_mix_te[i,j] >0){
+                      ynew_mix[j,i] =  density(ynew_mix_lsit[,i,j])$x[which(density(ynew_mix_lsit[,i,j])$y ==  max(density(ynew_mix_lsit[,i,j])$y))]
+          }
+        }
+      }
+
+     t_X_mix_te <- as.data.frame(t(X_mix_te))
+     colnames(t_X_mix_te) <- paste0('sub', 1:nsubjs)
+     predY <- as.data.frame(t_X_mix_te) %>% gather(NSub, targetDur, sub1:sub16) %>% separate(NSub, c("key", "NSub"), 'sub')
+     predY$key = NULL
+     
+     t_Y_mix <- as.data.frame(t(Y_mix))
+     colnames(t_Y_mix) <- paste0('sub', 1:nsubjs)
+     predResult <- data.frame(t_Y_mix) %>% gather(NSub, RP, paste0('sub', 1:nsubjs))
+     predResult <- cbind(predY, predResult$RP)
+     
+     colnames(ynew_mix) <- paste0('sub', 1:nsubjs)
+     ynew_mix <- data.frame(ynew_mix) %>% gather(NSub, predY, paste0('sub', 1:nsubjs))
+   
+     predResult <- cbind(predResult, ynew_mix$predY)
+     colnames(predResult) <- c("NSub", "targetDur","RP", "predY")
+     predResult$Exp = expName
+     PredYlist_mix <- rbind2(PredYlist_mix, predResult)
+     
+
+     # merge the parameters
+     Baypar <- data.frame("a_s" = a_s, "b_s" = b_s, "a_l" = a_l, "b_l" = b_l)
+     Baypar$Exp = expName
+     Baypar$wf = wf
+     Baypar$p_wf = p_wf
+     Baypar$g_wf = g_wf
+  
+     Bayparlist <- rbind2(Bayparlist, Baypar)
+  }
+  
+  write.csv(Bayparlist, file = paste0(modelResultPath, "/data/Bayparlist_Stan_", filename,".csv"))
+  write.csv(PredYlist_mix, file = paste0(modelResultPath, "/data/PredY_mix_Stan_", filename,".csv"))
+
+  return(list("Bayparlist" = Bayparlist, "PredYlist_mix" = PredYlist_mix))
+}
+
+
+```
+
+
+## run the model
+
+### run H3
+
+```{r}
+# compile models
+stanmodeH3 <- stan_model(model_code = stancodeH3, model_name="stanmodelH3")
+```
+
+```{r include=FALSE}
+## H3: Prior is dynamic updated (the distribution of the prior is updated. In H3, global and local priors are integrated first)
+BayparlistH3  <- funFitBayesianStanV4(AllExpData, stanmodeH3,'H3')
+```
+
+### run H4
+
+```{r include=FALSE}
+# compile models
+stanmodeH4 <- stan_model(model_code = stancodeH4, model_name="stanmodelH4")
+```
+
+```{r include=FALSE}
+##H4: integration of local priors( In H4, firstly integration of local priors, then integration of the global prior)
+BayparlistH4  <- funFitBayesianStanV4(AllExpData, stanmodeH4,'H4')
+```
+
+
+## display the model restults
+
+### Merge the Result data 
+
+To preprocess the model result data, and merge different model version data together.
+
+```{r}
+needpreprocess=1
+versionlist =c('Version4')
+modellist = c('H3','H4')
+
+if (needpreprocess == 1){
+
+  predY_mix_filename <- paste0("PredY_mix_Stan_", modellist, ".csv")
+  BayParlist_filename <- paste0("Bayparlist_Stan_", modellist, ".csv")
+  mergeData(predY_mix_filename, 'predY_mix', versionlist)
+  mergeData(BayParlist_filename, 'Bayparlist', versionlist)
+}
+
+```
+
+### load the model result data
+
+```{r}
+  AllDat_Bayparlist <- read_csv(paste0(rstanmodelPath, "/AllDat_Bayparlist.csv"))
+AllDat_predY_mix <- read_csv(paste0(rstanmodelPath, "/AllDat_predY_mix.csv"))
+```
+
+
+
+### Analysis on the Rstan model parameters
+
+#### Parameters
+```{r}
+  AllDat_Bayparlist$model <- factor(AllDat_Bayparlist$model, labels = c( "Hierarchical local-global model","Dual integration model"))
+m_Baypar <- dplyr::group_by(AllDat_Bayparlist, Exp, model, version) %>%
+  dplyr::summarize(m_as = mean(a_s), m_al = mean(a_l),
+            m_bs = mean(b_s), m_bl = mean(b_l),
+            m_wf = mean(wf), m_gwf = mean(g_wf), m_pwf = mean(g_wf) ) 
+m_Baypar
+```
+
+
+###  wf in models
+
+```{r}
+ggplot(m_Baypar, aes(x = Exp, y = m_wf, color = model, fill = model, group = model)) + 
+    geom_bar(stat = "identity",
+             position = position_dodge()) 
+```
+
+## Prediction results (mixed block)
+
+load the oberserved and predicted Y
+
+```{r}
+AllDat_predY_mix$model <- factor(AllDat_predY_mix$model, labels = c( "Hierarchical local-global model","Dual integration model"))
+AllDat_predY_mix$err <- AllDat_predY_mix$predY- AllDat_predY_mix$RP
+```
+
+
+
+### plot model results in scatter plot
+```{r}
+fig1 = ggplot(AllDat_predY_mix, aes(targetDur, err, color = model, shape = version)) + 
+  geom_point() + 
+  ylab('Prediction Error')+
+  facet_wrap(Exp~model)
+
+fig1
+```
+
+
+
+
+
+```{r}
+predY_mix <- dplyr::group_by(AllDat_predY_mix, targetDur, Exp, NSub, model,version) %>%
+    dplyr::summarize(m_RP = mean(RP), 
+                     n = n(), m_predY =mean(predY),
+                     ) %>%
+  dplyr::group_by(targetDur, Exp, model,version) %>%
+  dplyr::summarize(
+    n = n(),
+    m_m_predY = mean(m_predY),
+    se_m_predY = sd(m_predY) / sqrt(n - 1),
+    m_m_RP = mean(m_RP),
+    se_m_RP = sd(m_RP) / sqrt(n-1)
+  )
+
+predY_mix$m_rpErr = predY_mix$m_m_predY - predY_mix$m_m_RP
+predY_mix$m_relativeErr = predY_mix$m_rpErr / predY_mix$targetDur
+predY_mix
+```
+
+### The predication of mixed block
+
+```{r}
+#plot Error in mixed blocks
+  ggplot(data=predY_mix, aes(x= targetDur, y=m_rpErr, group = model, color= model)) + 
+    geom_bar(stat="identity")+
+    labs(x="target intervals", y="Error (predicted RP minus measured reproduction)")+
+  facet_wrap(Exp~model) 
+```
+
+
+```{r}
+#plot relative Error for mixed blocks
+ fig_rerr_model <-  ggplot(data=predY_mix, aes(x= targetDur, y=m_relativeErr*100, group = model, color= model)) + 
+    geom_bar(stat="identity")+
+    labs(x="target intervals", y="relative error (%)")+
+  facet_wrap(Exp~model) 
+
+ggsave(file.path('figures','fig_rerr_model.png'), fig_rerr_model, width = 7, height = 5)
+```
+
+
+```{r}
+#plot the average of the predicted Y under the mixed condition
+fig_mPredY_mix = ggplot(predY_mix) + 
+  geom_point(aes(targetDur, m_m_predY, group = model, color = model)) + 
+  geom_line(aes(targetDur, m_m_RP, group = model, color = model),  size = 1) + 
+  #geom_errorbar(aes(ymin = m_m_predY-se_m_predY, ymax = m_m_predY + se_m_predY), width = 0.05) + 
+  geom_abline(slope = 1, linetype = 2, size = 1) + # add diagonal line
+  facet_wrap(~Exp) +
+  guides(color = guide_legend(title = element_blank())) + # remove legend title
+  theme_classic() + 
+  theme(strip.background = element_blank()) + # remove subtitle background
+  labs(x = "Durations (secs)", y = "Mean Reproductions (secs)", size =15) + theme(legend.position="bottom")
+fig_mPredY_mix
+
+
+ggsave(file.path('figures','fig_mPredY_mix.png'), fig_mPredY_mix, width = 7, height = 5)
+```
+
+```{r}
+predY_mix$rpErr_squared <- predY_mix$m_rpErr^2
+m_predY_Err <- dplyr::group_by(predY_mix, Exp, model,version) %>%
+  dplyr::summarize(sum_rpErr = sum(rpErr_squared), 
+            n = n())
+
+fig_rpErr_model <- ggplot(m_predY_Err, aes(x = Exp, y = sum_rpErr, color = model, fill = model, group = model)) + 
+    geom_bar(stat = "identity",
+             position = position_dodge()) + theme(legend.position="bottom")
+
+ggsave(file.path('figures','fig_rpErr_model.png'), fig_rpErr_model, width = 7, height = 5)
+
+fig_rpErr_model
+```
+
+
+
+
+
+

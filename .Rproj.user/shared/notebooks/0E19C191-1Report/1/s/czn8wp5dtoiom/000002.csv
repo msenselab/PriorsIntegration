@@ -1,0 +1,7 @@
+"0","mCI$y = 0.02"
+"0","mCI[which(mCI$priortype == 'BR'),""y""] = 0.2"
+"0","mCI$targetDur = mCI$y"
+"0","mCI$m_m_RP = mCI$y"
+"0","mCI$IntersectionX = mCI$ci_Intercept_mean/(1-mCI$ci_Slope_mean)"
+"0","mCI[which(mCI$IntersectionX > mCI$maxDur),""maxDur""] = mCI[which(mCI$IntersectionX > mCI$maxDur),""IntersectionX""]"
+"0","mCI[which(mCI$IntersectionX < mCI$minDur),""minDur""] = mCI[which(mCI$IntersectionX < mCI$minDur),""IntersectionX""]"

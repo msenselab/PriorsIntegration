@@ -1,0 +1,8 @@
+"0","cor_err_table <- predY %>% dplyr::group_by(Exp, model) %>%"
+"0","  dplyr::summarise(r2 = cor(m_RP, m_mu_r, method = c(""pearson"", ""kendall"", ""spearman"")))%>% dplyr::group_by(Exp, model) %>%"
+"0","  dplyr::summarise(m_r2 = mean(r2))"
+"1","`summarise()` has grouped output by 'Exp'. You can override using the `.groups` argument.
+"
+"1","`summarise()` has grouped output by 'Exp'. You can override using the `.groups` argument.
+"
+"0","cor_err_table"

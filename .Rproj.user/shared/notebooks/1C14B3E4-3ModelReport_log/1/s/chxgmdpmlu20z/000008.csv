@@ -1,0 +1,10 @@
+"0","m_Baypar <- dplyr::group_by(AllDat_Bayparlist, Nsub, Exp, model) %>%"
+"0","    dplyr::summarize(m_mu_p_g = mean(mu_p_g),"
+"0","                   m_sig2_p_g = mean(sig2_p_g),"
+"0","                   m_mu_p_s_IR = mean(mu_p_s_IR),"
+"0","                   m_mu_p_l_IR = mean(mu_p_l_IR),"
+"0","                   m_sig2_p_g = mean(sig_pr2_s_IR),"
+"0","                   m_sig_pr2_l_IR = mean(sig_pr2_l_IR)) "
+"1","`summarise()` has grouped output by 'Nsub', 'Exp'. You can override using the `.groups` argument.
+"
+"0","m_Baypar"

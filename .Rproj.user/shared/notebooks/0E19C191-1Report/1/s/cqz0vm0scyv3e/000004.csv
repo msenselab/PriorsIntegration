@@ -1,0 +1,9 @@
+"0","##for plot the extend lines"
+"0","temp_xy<- sumexp%>% filter(targetDur == 0.8  | targetDur ==0.7328000| targetDur ==1.3100000)%>% filter(priortype == 'IR') %>% group_by(Exp, targetDur, priortype, range) %>%"
+"0","  dplyr::summarise(x = targetDur,"
+"0","                   y = m_m_RP)"
+"1","`summarise()` has grouped output by 'Exp', 'targetDur', 'priortype'. You can override using the `.groups` argument.
+"
+"0","temp_slope_pr = mm_slope_pr[, c(""Exp"", ""priortype"", ""range"", ""inP"", ""slope"", ""minRP"")]"
+"0","temp_xy = left_join(temp_xy, temp_slope_pr, by = c(""Exp"", ""priortype"", ""range""))"
+"0","temp_xy"
